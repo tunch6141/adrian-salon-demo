@@ -1,0 +1,7 @@
+service_id,service_name,duration_minutes,list_price_aud,colour_service,service_revenue_per_hour_aud
+SV01,Haircut,30,40,FALSE,80
+SV02,Wash and blow-dry,45,60,FALSE,80
+SV03,Conditioning treatment and blow-dry,60,100,FALSE,100
+SV04,Colour and haircut,120,240,TRUE,120
+SV05,"Colour, treatment and haircut package",150,325,TRUE,130
+SV06,"Highlights, toner and haircut",180,390,TRUE,130

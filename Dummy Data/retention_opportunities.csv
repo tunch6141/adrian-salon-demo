@@ -1,0 +1,104 @@
+customer_id,customer_name,completed_visits_in_history,last_completed_visit_date,median_visit_interval_days,estimated_due_date,days_overdue,future_appointment_id,recent_followup_count,last_service_id,estimated_repeat_service_hours,estimated_repeat_service_value_aud,action
+C0190,Lily Singh,3,16/6/2026,44,30/7/2026,45,,0,SV03,1,100,Review and contact
+C0077,Mia Wilson,4,7/7/2026,35,11/8/2026,33,,0,SV03,1,100,Review and contact
+C0181,Olivia Singh,4,8/7/2026,34,11/8/2026,33,,0,SV01,0.5,40,Review and contact
+C0142,Alice Taylor,4,13/7/2026,35,17/8/2026,27,,0,SV04,2,240,Review and contact
+C0216,Willow Singh,4,14/7/2026,34,17/8/2026,27,,0,SV01,0.5,40,Review and contact
+C0046,Lily Smith,4,14/7/2026,35,18/8/2026,26,,0,SV04,2,240,Review and contact
+C0052,Jessica Smith,4,14/7/2026,35,18/8/2026,26,,0,SV01,0.5,40,Review and contact
+C0094,Oliver Wilson,4,15/7/2026,34,18/8/2026,26,,0,SV01,0.5,40,Review and contact
+C0199,Sienna Singh,4,15/7/2026,35,19/8/2026,25,,0,SV01,0.5,40,Review and contact
+C0063,Lucas Smith,4,17/7/2026,34,20/8/2026,24,,0,SV06,3,390,Review and contact
+C0196,Jessica Singh,4,15/7/2026,36,20/8/2026,24,,0,SV01,0.5,40,Review and contact
+C0029,James Nguyen,4,15/7/2026,37,21/8/2026,23,,0,SV01,0.5,40,Review and contact
+C0084,Sophie Wilson,4,14/7/2026,39,22/8/2026,22,,0,SV04,2,240,Review and contact
+C0043,Grace Smith,4,20/7/2026,34,23/8/2026,21,,0,SV01,0.5,40,Review and contact
+C0168,Henry Chen,4,15/7/2026,39,23/8/2026,21,,0,SV01,0.5,40,Review and contact
+C0144,Willow Taylor,4,21/7/2026,35,25/8/2026,19,,0,SV01,0.5,40,Review and contact
+C0130,Oliver Taylor,4,15/7/2026,42,26/8/2026,18,,0,SV01,0.5,40,Review and contact
+C0245,James Brown,3,10/7/2026,47,26/8/2026,18,,0,SV06,3,390,Review and contact
+C0279,Lucas Williams,3,13/7/2026,45,27/8/2026,17,,0,SV05,2.5,325,Review and contact
+C0269,Emma Williams,3,14/7/2026,46,29/8/2026,15,,0,SV03,1,100,Review and contact
+C0071,Ivy Smith,4,21/7/2026,40,30/8/2026,14,,0,SV02,0.75,60,Review and contact
+C0085,Ella Wilson,3,13/7/2026,48,30/8/2026,14,,0,SV03,1,100,Review and contact
+C0089,Emma Wilson,4,22/7/2026,39,30/8/2026,14,,0,SV01,0.5,40,Review and contact
+C0118,Lily Taylor,3,13/7/2026,48,30/8/2026,14,,0,SV03,1,100,Review and contact
+C0264,Sophie Williams,3,15/7/2026,46,30/8/2026,14,,0,SV01,0.5,40,Review and contact
+C0116,Chloe Taylor,3,13/7/2026,49,31/8/2026,13,,0,SV04,2,240,Review and contact
+C0246,Ethan Brown,3,14/7/2026,48,31/8/2026,13,,0,SV02,0.75,60,Review and contact
+C0014,Ruby Nguyen,4,21/7/2026,42,1/9/2026,12,,0,SV02,0.75,60,Review and contact
+C0016,Jessica Nguyen,4,21/7/2026,42,1/9/2026,12,,0,SV04,2,240,Review and contact
+C0019,Sienna Nguyen,4,21/7/2026,42,1/9/2026,12,,0,SV03,1,100,Review and contact
+C0020,Sofia Nguyen,4,21/7/2026,42,1/9/2026,12,,0,SV04,2,240,Review and contact
+C0022,Oliver Nguyen,4,21/7/2026,42,1/9/2026,12,,0,SV02,0.75,60,Review and contact
+C0023,Jack Nguyen,4,21/7/2026,42,1/9/2026,12,,0,SV03,1,100,Review and contact
+C0024,Henry Nguyen,4,21/7/2026,42,1/9/2026,12,,0,SV04,2,240,Review and contact
+C0090,Hannah Wilson,4,27/7/2026,36,1/9/2026,12,,0,SV03,1,100,Review and contact
+C0202,Oliver Singh,4,22/7/2026,41,1/9/2026,12,,0,SV01,0.5,40,Review and contact
+C0242,Liam Brown,3,14/7/2026,49,1/9/2026,12,,0,SV02,0.75,60,Review and contact
+C0013,Ella Nguyen,4,22/7/2026,42,2/9/2026,11,,0,SV01,0.5,40,Review and contact
+C0015,Lucy Nguyen,4,21/7/2026,43,2/9/2026,11,,0,SV03,1,100,Review and contact
+C0017,Emma Nguyen,4,22/7/2026,42,2/9/2026,11,,0,SV01,0.5,40,Review and contact
+C0021,Noah Nguyen,4,22/7/2026,42,2/9/2026,11,,0,SV01,0.5,40,Review and contact
+C0104,Layla Wilson,4,27/7/2026,37,2/9/2026,11,,0,SV05,2.5,325,Review and contact
+C0260,Chloe Williams,3,17/7/2026,47,2/9/2026,11,,0,SV05,2.5,325,Review and contact
+C0018,Hannah Nguyen,4,22/7/2026,43,3/9/2026,10,,0,SV02,0.75,60,Review and contact
+C0064,William Smith,4,24/7/2026,41,3/9/2026,10,,0,SV06,3,390,Review and contact
+C0100,William Wilson,3,15/7/2026,50,3/9/2026,10,,0,SV01,0.5,40,Review and contact
+C0115,Grace Taylor,4,29/7/2026,36,3/9/2026,10,,0,SV01,0.5,40,Review and contact
+C0128,Sofia Taylor,4,28/7/2026,37,3/9/2026,10,,0,SV03,1,100,Review and contact
+C0248,Layla Brown,3,15/7/2026,50,3/9/2026,10,,0,SV02,0.75,60,Review and contact
+C0254,Amelia Williams,3,15/7/2026,50,3/9/2026,10,,0,SV01,0.5,40,Review and contact
+C0030,Ethan Nguyen,4,28/7/2026,38,4/9/2026,9,,0,SV02,0.75,60,Review and contact
+C0152,Chloe Chen,3,14/7/2026,52,4/9/2026,9,,0,SV04,2,240,Review and contact
+C0203,Jack Singh,4,27/7/2026,39,4/9/2026,9,,0,SV05,2.5,325,Review and contact
+C0127,Sienna Taylor,4,27/7/2026,40,5/9/2026,8,,0,SV04,2,240,Review and contact
+C0191,Emily Singh,4,31/7/2026,36,5/9/2026,8,,0,SV06,3,390,Review and contact
+C0228,Sophie Brown,3,15/7/2026,52,5/9/2026,8,,0,SV01,0.5,40,Review and contact
+C0249,Harper Brown,3,17/7/2026,50,5/9/2026,8,,0,SV06,3,390,Review and contact
+C0136,William Taylor,4,29/7/2026,39,6/9/2026,7,,0,SV01,0.5,40,Review and contact
+C0209,James Singh,4,31/7/2026,37,6/9/2026,7,,0,SV01,0.5,40,Review and contact
+C0072,Willow Smith,3,17/7/2026,52,7/9/2026,6,,0,SV06,3,390,Review and contact
+C0103,Aria Wilson,3,21/7/2026,48,7/9/2026,6,,0,SV04,2,240,Review and contact
+C0178,Alice Chen,4,27/7/2026,42,7/9/2026,6,,0,SV03,1,100,Review and contact
+C0198,Hannah Singh,4,31/7/2026,38,7/9/2026,6,,0,SV01,0.5,40,Review and contact
+C0157,Ella Chen,4,28/7/2026,42,8/9/2026,5,,0,SV02,0.75,60,Review and contact
+C0189,Zoe Singh,4,28/7/2026,42,8/9/2026,5,,0,SV03,1,100,Review and contact
+C0184,Isla Singh,4,29/7/2026,42,9/9/2026,4,,0,SV01,0.5,40,Review and contact
+C0214,Alice Singh,4,29/7/2026,42,9/9/2026,4,,0,SV01,0.5,40,Review and contact
+C0275,Jack Williams,3,21/7/2026,50,9/9/2026,4,,0,SV01,0.5,40,Review and contact
+C0078,Ava Wilson,3,20/7/2026,52,10/9/2026,3,,0,SV05,2.5,325,Review and contact
+C0082,Lily Wilson,4,28/7/2026,44,10/9/2026,3,,0,SV04,2,240,Review and contact
+C0138,Ethan Taylor,3,20/7/2026,52,10/9/2026,3,,0,SV05,2.5,325,Review and contact
+C0272,Sofia Williams,3,22/7/2026,50,10/9/2026,3,,0,SV02,0.75,60,Review and contact
+C0081,Zoe Wilson,4,3/8/2026,41,13/9/2026,0,,0,SV04,2,240,Review and contact
+C0110,Amelia Taylor,3,22/7/2026,53,13/9/2026,0,,0,SV01,0.5,40,Review and contact
+C0159,Lucy Chen,3,17/7/2026,58,13/9/2026,0,,0,SV06,3,390,Review and contact
+C0244,William Brown,3,22/7/2026,53,13/9/2026,0,,0,SV01,0.5,40,Review and contact
+C0066,Ethan Smith,4,6/7/2026,36,11/8/2026,33,A01846,0,SV03,1,100,Already booked
+C0058,Oliver Smith,3,3/7/2026,44,16/8/2026,28,A01883,0,SV06,3,390,Already booked
+C0154,Lily Chen,4,14/7/2026,34,17/8/2026,27,A01886,0,SV04,2,240,Already booked
+C0076,Isla Wilson,4,14/7/2026,35,18/8/2026,26,A01880,0,SV02,0.75,60,Already booked
+C0055,Sienna Smith,3,7/7/2026,46,22/8/2026,22,A01870,0,SV01,0.5,40,Already booked
+C0070,Alice Smith,3,8/7/2026,46,23/8/2026,21,A01875,0,SV01,0.5,40,Already booked
+C0259,Grace Williams,3,8/7/2026,46,23/8/2026,21,A01871,0,SV01,0.5,40,Already booked
+C0187,Grace Singh,4,14/7/2026,42,25/8/2026,19,A01889,0,SV03,1,100,Already booked
+C0102,Ethan Wilson,3,8/7/2026,49,26/8/2026,18,A01872,0,SV01,0.5,40,Already booked
+C0158,Ruby Chen,3,7/7/2026,50,26/8/2026,18,A01868,0,SV01,0.5,40,Already booked
+C0256,Isla Williams,3,10/7/2026,47,26/8/2026,18,A01877,0,SV06,3,390,Already booked
+C0231,Lucy Brown,3,8/7/2026,50,27/8/2026,17,A01885,0,SV01,0.5,40,Already booked
+C0003,Charlotte Nguyen,4,20/7/2026,42,31/8/2026,13,A01891,0,SV03,1,100,Already booked
+C0004,Isla Nguyen,4,20/7/2026,42,31/8/2026,13,A01893,0,SV04,2,240,Already booked
+C0005,Mia Nguyen,4,20/7/2026,42,31/8/2026,13,A01895,0,SV01,0.5,40,Already booked
+C0006,Ava Nguyen,4,21/7/2026,42,1/9/2026,12,A01892,0,SV02,0.75,60,Already booked
+C0007,Grace Nguyen,4,21/7/2026,42,1/9/2026,12,,1,SV03,1,100,Recent follow-up - review next action
+C0008,Chloe Nguyen,4,21/7/2026,42,1/9/2026,12,,1,SV04,2,240,Recent follow-up - review next action
+C0011,Emily Nguyen,4,21/7/2026,42,1/9/2026,12,,1,SV03,1,100,Recent follow-up - review next action
+C0012,Sophie Nguyen,4,21/7/2026,42,1/9/2026,12,,1,SV04,2,240,Recent follow-up - review next action
+C0112,Isla Taylor,3,14/7/2026,49,1/9/2026,12,A01879,0,SV03,1,100,Already booked
+C0002,Amelia Nguyen,4,22/7/2026,42,2/9/2026,11,A01890,0,SV02,0.75,60,Already booked
+C0009,Zoe Nguyen,4,22/7/2026,42,2/9/2026,11,,1,SV01,0.5,40,Recent follow-up - review next action
+C0010,Lily Nguyen,4,22/7/2026,42,2/9/2026,11,,1,SV02,0.75,60,Recent follow-up - review next action
+C0048,Sophie Smith,3,10/7/2026,54,2/9/2026,11,A01876,0,SV06,3,390,Already booked
+C0057,Noah Smith,3,14/7/2026,51,3/9/2026,10,A01873,0,SV04,2,240,Already booked
+C0001,Olivia Nguyen,4,24/7/2026,43,5/9/2026,8,A01894,0,SV01,0.5,40,Already booked

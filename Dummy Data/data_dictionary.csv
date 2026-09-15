@@ -1,0 +1,88 @@
+file,field,type,description
+services.csv,service_id,text,Primary key in services; joins appointments.
+services.csv,service_name,text,Service name
+services.csv,duration_minutes,number,Duration minutes
+services.csv,list_price_aud,number,List price aud
+services.csv,colour_service,boolean,Colour service
+services.csv,service_revenue_per_hour_aud,number,Service revenue per hour aud
+customers.csv,customer_id,text,"Primary key in customers; joins appointments, retail_sales, followups and retention_opportunities."
+customers.csv,customer_name,text,Customer name
+customers.csv,email,text,Email
+customers.csv,first_completed_visit_date,text,"Authoritative first-ever completed visit, including imported history before the six-month window. Blank means no completed visit yet."
+customers.csv,first_visit_source,text,First visit source
+customers.csv,preferred_staff_name,text,Preferred staff name
+customers.csv,contact_permission,text,Synthetic permission flag only; no real contact details are included.
+staff_capacity.csv,capacity_id,text,Capacity id
+staff_capacity.csv,staff_name,text,"Sarah, Matthew or Sam. Join capacity and transactions using this name."
+staff_capacity.csv,work_date,text,Work date
+staff_capacity.csv,week_start,text,Week start
+staff_capacity.csv,shift_start,text,Shift start
+staff_capacity.csv,shift_end,text,Shift end
+staff_capacity.csv,bookable_hours,number,Bookable hours
+appointments.csv,appointment_id,text,Primary key in appointments; foreign key in retail_sales and resulting_appointment_id in followups.
+appointments.csv,customer_id,text,"Primary key in customers; joins appointments, retail_sales, followups and retention_opportunities."
+appointments.csv,staff_name,text,"Sarah, Matthew or Sam. Join capacity and transactions using this name."
+appointments.csv,service_id,text,Primary key in services; joins appointments.
+appointments.csv,week_start,text,Week start
+appointments.csv,appointment_start,text,Appointment start
+appointments.csv,appointment_end,text,Appointment end
+appointments.csv,booking_created_at,text,When this booking was recorded. Required for historical lead-time comparisons.
+appointments.csv,status,text,Status
+appointments.csv,cancelled_at,text,Blank unless cancelled. Historical booking is active if created by cutoff and cancellation is blank or later than cutoff.
+appointments.csv,completed_at,text,Completed at
+appointments.csv,booked_duration_minutes,number,Booked duration minutes
+appointments.csv,quoted_service_amount_aud,number,"Expected service price, not recognised revenue for future appointments."
+appointments.csv,service_revenue_aud,number,Recognised completed service revenue. Zero for booked/cancelled appointments. Retail excluded.
+appointments.csv,discount_amount_aud,number,Discount amount aud
+appointments.csv,booking_channel,text,Booking channel
+appointments.csv,is_new_customer_at_booking,boolean,"No completed visit before booking_created_at. For weekly new/returning metrics, recompute at the comparison cutoff using first_completed_visit_date."
+retail_sales.csv,retail_sale_id,text,Retail sale id
+retail_sales.csv,appointment_id,text,Primary key in appointments; foreign key in retail_sales and resulting_appointment_id in followups.
+retail_sales.csv,customer_id,text,"Primary key in customers; joins appointments, retail_sales, followups and retention_opportunities."
+retail_sales.csv,staff_name,text,"Sarah, Matthew or Sam. Join capacity and transactions using this name."
+retail_sales.csv,sold_at,text,Sold at
+retail_sales.csv,product_name,text,Product name
+retail_sales.csv,quantity,number,Quantity
+retail_sales.csv,unit_price_aud,number,Unit price aud
+retail_sales.csv,retail_revenue_aud,number,Retail revenue aud
+customer_followups.csv,followup_id,text,Followup id
+customer_followups.csv,customer_id,text,"Primary key in customers; joins appointments, retail_sales, followups and retention_opportunities."
+customer_followups.csv,contacted_at,text,Contacted at
+customer_followups.csv,channel,text,Channel
+customer_followups.csv,reason,text,Reason
+customer_followups.csv,outcome,text,Outcome
+customer_followups.csv,next_action_date,text,Next action date
+customer_followups.csv,resulting_appointment_id,text,Explicit simulated follow-up attribution. A link is not causal proof.
+weekly_metrics.csv,week_start,text,Week start
+weekly_metrics.csv,comparison_cutoff,text,Comparison cutoff
+weekly_metrics.csv,capacity_hours,number,Capacity hours
+weekly_metrics.csv,booked_appointments_at_cutoff,number,Booked appointments at cutoff
+weekly_metrics.csv,new_customer_appointments_at_cutoff,number,New customer appointments at cutoff
+weekly_metrics.csv,returning_customer_appointments_at_cutoff,number,Returning customer appointments at cutoff
+weekly_metrics.csv,new_customer_hours_at_cutoff,number,New customer hours at cutoff
+weekly_metrics.csv,returning_customer_hours_at_cutoff,number,Returning customer hours at cutoff
+weekly_metrics.csv,booked_hours_at_cutoff,number,Booked hours at cutoff
+weekly_metrics.csv,booking_utilisation_at_cutoff,number,Booked hours at Sunday cutoff / 114 rostered bookable hours.
+weekly_metrics.csv,completed_service_hours,number,Completed service hours
+weekly_metrics.csv,service_revenue_aud,number,Recognised completed service revenue. Zero for booked/cancelled appointments. Retail excluded.
+weekly_metrics.csv,service_revenue_per_completed_hour_aud,number,Service revenue per completed hour aud
+weekly_metrics.csv,period_role,text,Period role
+retention_opportunities.csv,customer_id,text,"Primary key in customers; joins appointments, retail_sales, followups and retention_opportunities."
+retention_opportunities.csv,customer_name,text,Customer name
+retention_opportunities.csv,completed_visits_in_history,number,Completed visits in history
+retention_opportunities.csv,last_completed_visit_date,text,Last completed visit date
+retention_opportunities.csv,median_visit_interval_days,number,Median visit interval days
+retention_opportunities.csv,estimated_due_date,text,"Last completed date plus median gap between observed completed visits. Estimate, not confirmed customer intention."
+retention_opportunities.csv,days_overdue,number,Days overdue
+retention_opportunities.csv,future_appointment_id,text,Future appointment id
+retention_opportunities.csv,recent_followup_count,number,Recent followup count
+retention_opportunities.csv,last_service_id,text,Last service id
+retention_opportunities.csv,estimated_repeat_service_hours,number,Estimated repeat service hours
+retention_opportunities.csv,estimated_repeat_service_value_aud,number,"Last service price used as a hypothetical repeat value, not guaranteed revenue."
+retention_opportunities.csv,action,text,Action
+scenario_answers.csv,scenario,number,Scenario
+scenario_answers.csv,metric,text,Metric
+scenario_answers.csv,baseline_value,number,Baseline value
+scenario_answers.csv,current_value,number,Current value
+scenario_answers.csv,unit,text,Unit
+scenario_answers.csv,interpretation,text,Interpretation

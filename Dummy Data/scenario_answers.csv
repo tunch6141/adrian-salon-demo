@@ -1,0 +1,28 @@
+scenario,metric,baseline_value,current_value,unit,interpretation
+1,Sarah_colour_customers,5,5,count,Compare completed visits; retail revenue is separate.
+1,Sarah_shampoo_buyers,3,1,count,Compare completed visits; retail revenue is separate.
+1,Sarah_service_revenue,3800,3800,AUD,Compare completed visits; retail revenue is separate.
+1,Sarah_completed_hours,38,38,hours,Compare completed visits; retail revenue is separate.
+1,Sarah_shampoo_purchase_rate,0.6,0.2,proportion,Distinct colour-service customers buying shampoo / distinct colour-service customers.
+1,Matthew_colour_customers,9,5,count,Compare completed visits; retail revenue is separate.
+1,Matthew_shampoo_buyers,5,3,count,Compare completed visits; retail revenue is separate.
+1,Matthew_service_revenue,3172.5,2655,AUD,Compare completed visits; retail revenue is separate.
+1,Matthew_completed_hours,26.75,26.75,hours,Compare completed visits; retail revenue is separate.
+1,Matthew_shampoo_purchase_rate,0.555555556,0.6,proportion,Distinct colour-service customers buying shampoo / distinct colour-service customers.
+1,Sam_colour_customers,9,6,count,Compare completed visits; retail revenue is separate.
+1,Sam_shampoo_buyers,5,3,count,Compare completed visits; retail revenue is separate.
+1,Sam_service_revenue,3140,2670,AUD,Compare completed visits; retail revenue is separate.
+1,Sam_completed_hours,26.5,26.5,hours,Compare completed visits; retail revenue is separate.
+1,Sam_shampoo_purchase_rate,0.555555556,0.5,proportion,Distinct colour-service customers buying shampoo / distinct colour-service customers.
+1,Sarah_shampoo_revenue,105,35,AUD,Down $70 or 66.67%; does not establish why customers did not buy.
+2,booked_appointments_at_cutoff,80,50,count,Same Sunday lead-time comparison. Baseline excludes this week.
+2,new_customer_appointments_at_cutoff,24,24,count,Same Sunday lead-time comparison. Baseline excludes this week.
+2,returning_customer_appointments_at_cutoff,56,26,count,Same Sunday lead-time comparison. Baseline excludes this week.
+2,new_customer_hours_at_cutoff,27,27,hours,Same Sunday lead-time comparison. Baseline excludes this week.
+2,returning_customer_hours_at_cutoff,64.25,30,hours,Same Sunday lead-time comparison. Baseline excludes this week.
+2,booked_hours_at_cutoff,91.25,57,hours,Same Sunday lead-time comparison. Baseline excludes this week.
+2,booking_utilisation_at_cutoff,0.800438596,0.5,proportion,Same Sunday lead-time comparison. Baseline excludes this week.
+2,due_customers_with_no_future_booking_or_recent_followup,,76,count,Calculated from at least three completed visits; review list before contacting.
+3,completed_service_hours,91.25,91.25,hours,Service mix changes; no price changes or discounts.
+3,service_revenue_aud,10112.5,9125,AUD,Service mix changes; no price changes or discounts.
+3,service_revenue_per_completed_hour,110.8219178,100,AUD/hour,Ratio of total service revenue to completed hours; retail excluded; not profit.

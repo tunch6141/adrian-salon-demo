@@ -1,0 +1,24 @@
+PASS — exported CSVs validated.
+
+Checks: unique identifiers; foreign keys; date ordering; duration and price reconciliation; recognised revenue only for completed visits; retail and follow-up links; daily shift boundaries; no staff overlaps; 38-hour weekly capacity; same-lead-time booking metrics; all three scenario totals.
+
+{
+  "row_counts": {
+    "services": 6,
+    "customers": 743,
+    "staff_capacity": 420,
+    "appointments": 1895,
+    "retail_sales": 294,
+    "customer_followups": 96,
+    "weekly_metrics": 27,
+    "retention_opportunities": 103,
+    "scenario_answers": 27,
+    "data_dictionary": 87
+  },
+  "baseline_weekly_service_revenue": 10112.5,
+  "current_service_revenue": 9125,
+  "baseline_revenue_per_hour": 110.82191780821918,
+  "current_revenue_per_hour": 100.0,
+  "retention_due": 103,
+  "retention_actionable": 76
+}
