@@ -98,6 +98,9 @@ def mix_results(t):
 def show_table(frame):
     st.dataframe(frame, hide_index=True, use_container_width=True)
 
+def money_change(value):
+    return f"{'-' if value < 0 else '+'}${abs(value):,.2f}"
+
 def main():
     st.set_page_config(page_title="Adrian | Salon Insights", page_icon='✂', layout='wide')
     st.markdown('''<style>
@@ -118,9 +121,10 @@ def main():
     b_rev, c_rev = base.service_revenue_aud.sum()/4, current.service_revenue_aud.sum()
     b_h, c_h = base.hours.sum()/4, current.hours.sum()
     cols = st.columns(3)
-    cols[0].metric('This week’s service revenue', f'${c_rev:,.0f}', f'${c_rev-b_rev:,.2f} vs four-week average')
-    cols[1].metric('Next week booked', f'{next_a.hours.sum()/cap:.0%}', f'{next_a.hours.sum():g} of {cap:g} hours', delta_color='off')
-    cols[2].metric('Service revenue per hour', f'${c_rev/c_h:.2f}', f'${c_rev/c_h-b_rev/b_h:.2f} vs four-week baseline')
+    cols[0].metric('This week’s service revenue', f'${c_rev:,.0f}', f'{money_change(c_rev-b_rev)} vs four-week average')
+    cols[1].metric('Next week booked', f'{next_a.hours.sum()/cap:.0%}')
+    cols[1].caption(f'{next_a.hours.sum():g} of {cap:g} hours')
+    cols[2].metric('Service revenue per hour', f'${c_rev/c_h:.2f}', f'{money_change(c_rev/c_h-b_rev/b_h)} vs four-week baseline')
     st.caption('This week: 7–13 Sep · Baseline: 10 Aug–6 Sep · Next week: 14–20 Sep')
     tabs = st.tabs(['1 · Sarah’s sales', '2 · Fill next week', '3 · Service value'])
 
@@ -130,14 +134,14 @@ def main():
         n = sr[(sr.Staff=='Sarah') & (sr.Period=='This week')].iloc[0]
         loss = b['Shampoo revenue']-n['Shampoo revenue']
         st.subheader('Why did Sarah’s sales fall while she was fully booked?')
-        st.info(f"Sarah’s service revenue stayed at ${n['Service revenue']:,.0f}. Shampoo revenue fell by ${loss:,.0f}, with {n['Shampoo buyers']:g} buyer this week versus {b['Shampoo buyers']:g} on average.")
+        st.info(f"Sarah’s service revenue stayed at AUD {n['Service revenue']:,.0f}. Shampoo revenue fell by AUD {loss:,.0f}, with {n['Shampoo buyers']:g} buyer this week versus {b['Shampoo buyers']:g} on average.")
         cols = st.columns(3)
         cols[0].metric('Sarah’s completed hours', f"{n['Hours']:g}")
         cols[1].metric('Colour customers', f"{n['Colour customers']:g}")
         cols[2].metric('Shampoo purchase rate', f"{n['Purchase rate']:.0%}", f"{(n['Purchase rate']-b['Purchase rate'])*100:.0f} percentage points")
         rates = sr.pivot(index='Staff', columns='Period', values='Purchase rate').mul(100)
         st.write('**Shampoo buyers per 100 colour-service customers**')
-        st.bar_chart(rates, color=['#8ba8ad', '#176c70'])
+        st.bar_chart(rates, color=['#8ba8ad', '#176c70'], stack=False)
         st.caption('Matthew and Sam maintain broadly similar purchase rates. Their colour-customer volumes differ, so raw shampoo sales alone are not a fair comparison.')
         with st.expander('See the five colouring appointments'):
             colour = current[current.staff_name.eq('Sarah') & current.colour_service].copy()
@@ -160,7 +164,7 @@ def main():
         booking=pd.DataFrame(rows)
         st.info('New-customer hours are stable. The booking gap is in returning customers.')
         show_table(booking)
-        st.bar_chart(booking.pivot(index='Customer type',columns='Period',values='Hours'), color=['#8ba8ad','#176c70'])
+        st.bar_chart(booking.pivot(index='Customer type',columns='Period',values='Hours'), color=['#8ba8ad','#176c70'], stack=False)
         st.caption('Hours booked at the same lead time: Sunday before each target week. New means no completed visit before that cutoff, including first-visit history from before the CSV period.')
         pool=retention(t)
         st.write('**Customers to review for follow-up**')
@@ -185,11 +189,11 @@ def main():
         st.info(f'Completed hours stayed at {c_h:g}. Service revenue fell by ${b_rev-c_rev:,.2f}, as more time went to lower-value services.')
         mix=mix_results(t)
         st.write('**Completed hours by service**')
-        st.bar_chart(mix.pivot(index='Service',columns='Period',values='Hours'),color=['#8ba8ad','#176c70'])
+        st.bar_chart(mix.pivot(index='Service',columns='Period',values='Hours'),color=['#8ba8ad','#176c70'], stack=False, horizontal=True, height=450)
         with st.expander('See revenue and hours for each service', expanded=True):
             show_table(mix.round(2))
         shift=base.loc[base.service_revenue_per_hour_aud.eq(130),'hours'].sum()/4-current.loc[current.service_revenue_per_hour_aud.eq(130),'hours'].sum()
-        st.write(f'**What explains the difference:** {shift:g} hours moved from $130/hour services to $80/hour services. At a $50 difference per hour, that accounts for ${shift*50:,.2f}. Prices and discounts are unchanged in this sample.')
+        st.write(f'**What explains the difference:** {shift:g} hours moved from AUD 130/hour services to AUD 80/hour services. At an AUD 50 difference per hour, that accounts for AUD {shift*50:,.2f}. Prices and discounts are unchanged in this sample.')
         st.write('**Next action:** review whether targeted promotion of colouring packages could increase suitable bookings. Start with customers due for colouring, then measure package bookings, utilisation and revenue per hour.')
         st.caption('Revenue per hour is not profit. Product costs and campaign enquiries are absent, so we cannot calculate package margins or prove that promotion will increase demand.')
     with st.expander('How this demo works'):
