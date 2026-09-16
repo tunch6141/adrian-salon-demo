@@ -13,13 +13,26 @@ from business_context import ContextStore
 def safe_text(text):st.markdown(text.replace('$',r'\$'))
 
 
+def build_chart(df,chart):
+    x,y=chart['x'],chart['y']
+    series=chart.get('series','')
+    c=alt.Chart(df)
+    tooltip=[alt.Tooltip(col,type='quantitative' if pd.api.types.is_numeric_dtype(df[col]) else 'nominal') for col in df.columns]
+    if chart['kind']=='pie':
+        return c.mark_arc().encode(theta=alt.Theta(y,type='quantitative'),color=alt.Color(x,type='nominal'),tooltip=tooltip)
+    c=(c.mark_line(point=True) if chart['kind']=='line' else c.mark_bar()).encode(x=alt.X(x,type='ordinal',sort=None),y=alt.Y(y,type='quantitative'),tooltip=tooltip)
+    if series:
+        c=c.encode(color=alt.Color(series,type='nominal',title='Staff' if series=='staff_name' else series))
+        if chart['kind']=='bar':c=c.encode(xOffset=alt.XOffset(series,type='nominal'))
+    return c
+
 def render_result(item):
     status=item['status']
     if status=='context':
         st.info('I have prepared an owner-context draft. Review the dates and explanation below before saving.')
     elif status in ['unsupported','clarify']:
         st.info('No verified answer is available for this request.')
-        st.caption('The model identified the following information gap or clarification:')
+        st.caption('What information is missing or needs clarifying:')
         safe_text(item['plan']['missing_information'])
     elif status=='blocked':
         st.warning('The evidence check did not approve an answer. I have withheld the explanation; you can inspect the query results below or ask a narrower question.')
@@ -27,16 +40,17 @@ def render_result(item):
         a=item['answer']
         for claim in a['claims']:
             safe_text(claim['text'])
+        if item['plan'].get('diagnostic') and len(item['plan']['diagnostic']['staff'])>1 and item['results']:
+            summary=pd.DataFrame(item['results'][0]['rows'])
+            if 'staff_name' in summary:
+                comparison=summary.set_index('staff_name').T
+                comparison.index=([str(x).replace('_',' ').title() for x in comparison.index])
+                st.dataframe(comparison.round(2),use_container_width=True)
         chart=a['chart']
         if chart['kind']!='none':
             df=pd.DataFrame(item['results'][chart['result']]['rows'])
             x,y=chart['x'],chart['y']
-            c=alt.Chart(df)
-            if chart['kind']=='pie':
-                c=c.mark_arc().encode(theta=alt.Theta(y,type='quantitative'),color=alt.Color(x,type='nominal'),tooltip=list(df.columns))
-            else:
-                c=(c.mark_line(point=True) if chart['kind']=='line' else c.mark_bar()).encode(x=alt.X(x,type='ordinal',sort=None),y=alt.Y(y,type='quantitative'),tooltip=list(df.columns))
-            st.altair_chart(c,use_container_width=True)
+            st.altair_chart(build_chart(df,chart),use_container_width=True)
         for label,key in [('What was investigated','investigation'),('Suggested action','recommendation'),('What to measure','measurement')]:
             if a[key]:
                 with st.expander(label):safe_text(a[key])
@@ -98,7 +112,7 @@ def context_form(store):
 
 def render(t,setting):
     st.subheader('Ask your salon')
-    st.caption('Version 4 · Dynamic database queries · Evidence review · Owner context')
+    st.caption('Version 4.1 · Revenue investigation · Staff comparisons · Checked totals')
     key,model,password=setting('OPENAI_API_KEY'),setting('OPENAI_MODEL'),setting('DEMO_PASSWORD')
     if not (key and model and password):
         st.info('Add OPENAI_API_KEY, OPENAI_MODEL and DEMO_PASSWORD in Streamlit Secrets.');return
