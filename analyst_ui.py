@@ -28,7 +28,26 @@ def build_chart(df,chart):
 
 def render_result(item):
     status=item['status']
-    if status=='context':
+    if status=='explanation':
+        st.info('The app retrieved data but could not verify its written explanation. That does not mean your business question is unanswerable. The tables contain the retrieved figures; the explanation was withheld to avoid presenting an unchecked claim.')
+    elif status=='facts_only':
+        st.info('The results were retrieved, but the written explanation did not pass its checks. Showing the calculated results instead.')
+        for result in item['results']:
+            if result['table']=='approved_period_comparison':
+                for row in result['rows']:
+                    if row['metric']=='service_revenue_aud':
+                        change=row['difference']
+                        direction='higher' if change>0 else 'lower' if change<0 else 'unchanged'
+                        divisor=row['baseline_divisor']
+                        baseline_label='total' if divisor==1 else f'total divided by {divisor:g}'
+                        st.write(f"{row['staff_name']}: AUD {row['current_value']:,.2f} service revenue for {row['current_start']} to {row['current_end']}. Baseline {row['baseline_start']} to {row['baseline_end']} ({baseline_label}): AUD {row['baseline_value']:,.2f}. Difference: AUD {abs(change):,.2f} {direction}.")
+        if item['plan'].get('diagnostic') and item['results']:
+            st.dataframe(pd.DataFrame(item['results'][0]['rows']),hide_index=True)
+        else:
+            for result in item['results'][:2]:
+                st.caption(result['table'])
+                st.dataframe(pd.DataFrame(result['rows']).head(10),hide_index=True)
+    elif status=='context':
         st.info('I have prepared an owner-context draft. Review the dates and explanation below before saving.')
     elif status in ['unsupported','clarify']:
         st.info('No verified answer is available for this request.')
@@ -55,6 +74,9 @@ def render_result(item):
             if a[key]:
                 with st.expander(label):safe_text(a[key])
         if a['missing_information']:st.info(a['missing_information'])
+    if item.get('timing'):
+        timing=item['timing']
+        st.caption(f"Completed in {timing['total_seconds']:.1f}s · {len(timing['calls'])} AI calls")
     if item['results']:
         with st.expander('Evidence and calculations'):
             st.caption(item['plan']['scope'])
@@ -66,6 +88,7 @@ def render_result(item):
                 st.write('Relevant owner-reported context — not independently verified:')
                 st.dataframe(pd.DataFrame(item['contexts']),hide_index=True)
             if item.get('issues'):st.write(item['issues'])
+            if item.get('timing'):st.write(item['timing']['calls'])
 
 
 def context_form(store):
@@ -112,7 +135,7 @@ def context_form(store):
 
 def render(t,setting):
     st.subheader('Ask your salon')
-    st.caption('Version 4.1 · Revenue investigation · Staff comparisons · Checked totals')
+    st.caption('Version 4.2 · Calculated answers · Period comparisons · Request timing')
     key,model,password=setting('OPENAI_API_KEY'),setting('OPENAI_MODEL'),setting('DEMO_PASSWORD')
     if not (key and model and password):
         st.info('Add OPENAI_API_KEY, OPENAI_MODEL and DEMO_PASSWORD in Streamlit Secrets.');return
@@ -138,11 +161,11 @@ def render(t,setting):
         from openai import OpenAI
         db=None
         try:
-            with st.spinner('Planning the investigation, querying data and checking evidence…'):
+            with st.status('Investigating your question…',expanded=True) as progress:
                 db=Database(t)
-                history=[{'question':x['question'],'plan':x['result']['plan'],'answer':x['result']['answer']} for x in turns[-5:]]
+                history=[{'question':x['question'],'plan':x['result']['plan'],'answer':x['result']['answer'],'status':x['result']['status']} for x in turns[-5:]]
                 # History is only interpretation context; each answer retrieves fresh database evidence.
-                result=investigate(OpenAI(api_key=key,timeout=60,max_retries=0),model,db,question.strip(),history,store)
+                result=investigate(OpenAI(api_key=key,timeout=60,max_retries=0),model,db,question.strip(),history,store,on_stage=lambda stage: progress.update(label=stage))
                 st.session_state.v4_turns=(turns+[{'question':question.strip(),'result':result}])[-10:]
                 if result['status']=='context' and result['plan']['draft']:
                     st.session_state.context_draft=result['plan']['draft']

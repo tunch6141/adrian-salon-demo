@@ -144,6 +144,8 @@ def service_diagnostic(db,staff,start,end):
     where=f"visit_date BETWEEN '{start}' AND '{end}' AND staff_name IN ({names})"
     summary=db.query(f"SELECT staff_name,COUNT(*) AS completed_appointments,SUM(hours) AS completed_service_hours,SUM(service_revenue_aud) AS service_revenue_aud,SUM(service_revenue_aud)/NULLIF(SUM(hours),0) AS revenue_per_service_hour FROM completed_visits WHERE {where} GROUP BY staff_name ORDER BY staff_name")
     mix=db.query(f"SELECT staff_name,service_name,COUNT(*) AS appointments,SUM(hours) AS completed_service_hours,SUM(service_revenue_aud) AS service_revenue_aud,SUM(service_revenue_aud)/NULLIF(SUM(hours),0) AS revenue_per_service_hour FROM completed_visits WHERE {where} GROUP BY staff_name,service_name ORDER BY service_name,staff_name")
+    for output in [summary,mix]:
+        for row in output['rows']:row.update(period_start=start,period_end=end)
     result=[summary,mix]
     if len(summary['rows'])==2:
         left,right=summary['rows']
@@ -185,3 +187,54 @@ def validate_claim_numbers(results,claim,context_ids,periods):
         tolerance=0.5*(10**(-decimals))+1e-8
         if not any(abs(v-n)<tolerance for v in values):
             raise QueryBlocked('A number in the answer is not present in its cited results. Retrieve a calculated total or difference.')
+
+
+def bind_claim_values(results,claim,periods):
+    """Bind numeric facts from result cells, instead of auditing model-typed numbers."""
+    import re
+    refs=claim['evidence']
+    text=claim['text']
+    without_slots=re.sub(r'\[\[(?:\d+|start|end)\]\]','',text)
+    if re.search(r'\d',without_slots):
+        raise QueryBlocked('Use evidence placeholders for numbers, including years; do not type numerical facts.')
+    def replace(match):
+        key=match.group(1)
+        if key in ['start','end']:
+            value=periods[0 if key=='start' else 1]
+            if not value:raise QueryBlocked('No date is available for that placeholder')
+            return value
+        i=int(key)
+        if i>=len(refs):raise QueryBlocked('Answer placeholder references a missing citation')
+        ref=refs[i];value=reference_value(results,ref)
+        style=ref.get('format','plain')
+        if value is None:return 'not available'
+        if isinstance(value,(int,float)):
+            if style=='money':return f'AUD {value:,.2f}'
+            if style=='percent':return f'{value:,.2f}%'
+            return f'{value:,.2f}'.rstrip('0').rstrip('.')
+        return str(value)
+    rendered=re.sub(r'\[\[(\d+|start|end)\]\]',replace,text)
+    if '[[' in rendered:raise QueryBlocked('Malformed evidence placeholder')
+    return rendered
+
+
+def period_diagnostic(db,staff,start,end,comparison_start,comparison_end,divisor=1):
+    from datetime import date
+    if divisor<1 or divisor>52:raise QueryBlocked('Invalid baseline divisor')
+    for value in [start,end,comparison_start,comparison_end]:date.fromisoformat(value)
+    if not (comparison_start<=comparison_end<start<=end):raise QueryBlocked('Comparison period must finish before the current period')
+    focus=service_diagnostic(db,staff,start,end)
+    baseline=service_diagnostic(db,staff,comparison_start,comparison_end)
+    result=focus+baseline
+    base={r['staff_name']:r for r in baseline[0]['rows']}
+    rows=[]
+    metrics=['service_revenue_aud','completed_service_hours','completed_appointments','revenue_per_service_hour']
+    for current in focus[0]['rows']:
+        old=base.get(current['staff_name'])
+        if not old:continue
+        for metric in metrics:
+            previous=old[metric]/(1 if metric=='revenue_per_service_hour' else divisor)
+            actual=current[metric]
+            rows.append({'staff_name':current['staff_name'],'metric':metric,'current_start':start,'current_end':end,'baseline_start':comparison_start,'baseline_end':comparison_end,'baseline_divisor':divisor,'current_value':actual,'baseline_value':previous,'difference':actual-previous,'percentage_change':100*(actual-previous)/previous if previous else None})
+    result.append({'id':'period_comparison_'+focus[0]['id'],'table':'approved_period_comparison','sql':'Python current minus baseline; baseline totals divided by stated divisor. Rate uses ratio of sums.','source_result_ids':[focus[0]['id'],baseline[0]['id']],'rows':rows,'row_count':len(rows)})
+    return result
