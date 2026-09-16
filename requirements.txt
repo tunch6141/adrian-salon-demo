@@ -3,4 +3,4 @@ pandas>=2.2,<3.0
 openai>=1.68,<3
 sqlglot>=26,<30
 requests>=2.32,<3
-altair>=5,<6
+altair>=6,<7
