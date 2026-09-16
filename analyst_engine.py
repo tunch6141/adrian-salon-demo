@@ -125,7 +125,63 @@ def validate_chart(results, chart):
     rows=results[i]['rows']
     if not rows:raise QueryBlocked('Chart has no rows')
     x,y=chart['x'],chart['y']
+    series=chart.get('series','')
+    if series and any(series not in r for r in rows):raise QueryBlocked('Chart series is not a result column')
+    if not series and len({str(r.get(x)) for r in rows})!=len(rows):raise QueryBlocked('Repeated x values require a series column or further aggregation')
     if any(x not in r or y not in r or not isinstance(r[y],(int,float)) for r in rows):
         raise QueryBlocked('Chart must reference numeric query results')
     if chart['kind']=='pie' and (any(r[y]<0 for r in rows) or sum(r[y] for r in rows)<=0):
         raise QueryBlocked('Pie chart requires positive composition values')
+
+
+def service_diagnostic(db,staff,start,end):
+    """Reusable expert analysis, parameterised by people/date; no scenario answers."""
+    from datetime import date
+    if not staff or not set(staff)<=set(['Sarah','Matthew','Sam']):raise QueryBlocked('Unknown staff in comparison')
+    start,end=date.fromisoformat(start).isoformat(),date.fromisoformat(end).isoformat()
+    if start>end:raise QueryBlocked('Comparison dates are reversed')
+    names=','.join("'"+name+"'" for name in sorted(set(staff)))
+    where=f"visit_date BETWEEN '{start}' AND '{end}' AND staff_name IN ({names})"
+    summary=db.query(f"SELECT staff_name,COUNT(*) AS completed_appointments,SUM(hours) AS completed_service_hours,SUM(service_revenue_aud) AS service_revenue_aud,SUM(service_revenue_aud)/NULLIF(SUM(hours),0) AS revenue_per_service_hour FROM completed_visits WHERE {where} GROUP BY staff_name ORDER BY staff_name")
+    mix=db.query(f"SELECT staff_name,service_name,COUNT(*) AS appointments,SUM(hours) AS completed_service_hours,SUM(service_revenue_aud) AS service_revenue_aud,SUM(service_revenue_aud)/NULLIF(SUM(hours),0) AS revenue_per_service_hour FROM completed_visits WHERE {where} GROUP BY staff_name,service_name ORDER BY service_name,staff_name")
+    result=[summary,mix]
+    if len(summary['rows'])==2:
+        left,right=summary['rows']
+        gap={'left_staff':left['staff_name'],'right_staff':right['staff_name'],'comparison':'left minus right','revenue_difference_aud':left['service_revenue_aud']-right['service_revenue_aud'],'service_hours_difference':left['completed_service_hours']-right['completed_service_hours'],'revenue_per_hour_difference':left['revenue_per_service_hour']-right['revenue_per_service_hour']}
+        # Exact additive service-category revenue differences, including absent categories.
+        services=sorted(set(r['service_name'] for r in mix['rows']))
+        differences=[]
+        for name in services:
+            per={r['staff_name']:r for r in mix['rows'] if r['service_name']==name}
+            lv=per.get(left['staff_name'],{}).get('service_revenue_aud',0)
+            rv=per.get(right['staff_name'],{}).get('service_revenue_aud',0)
+            differences.append({'service_name':name,'left_staff':left['staff_name'],'right_staff':right['staff_name'],'left_revenue_aud':lv,'right_revenue_aud':rv,'left_minus_right_revenue_aud':lv-rv})
+        assert abs(sum(r['left_minus_right_revenue_aud'] for r in differences)-gap['revenue_difference_aud'])<0.01
+        for label,rows in [('staff_gap',[gap]),('service_revenue_gap',differences)]:
+            result.append({'id':label+'_'+summary['id'],'table':'approved_'+label,'sql':'Python subtraction of the cited summary/mix SQL results (left minus right).','source_result_ids':[summary['id'],mix['id']],'rows':rows,'row_count':len(rows)})
+    return result
+
+
+def validate_claim_numbers(results,claim,context_ids,periods):
+    """Reject invented numeric aggregates; a valid citation alone is insufficient."""
+    import re
+    values=[]
+    for ref in claim['evidence']:
+        value=reference_value(results,ref)
+        if isinstance(value,(int,float)):values.append(float(value))
+        elif isinstance(value,str):
+            # Numeric portions of cited dates/labels can be quoted, not used as metrics.
+            values.extend(float(n) for n in re.findall(r'\d+(?:\.\d+)?',value))
+    # Full dates are checked by review; allow date years explicitly present in scope.
+    for period in periods:
+        if period:
+            values.extend(float(n) for n in re.findall(r'\d+',period))
+    text=re.sub(r'\b\d{4}-\d{2}-\d{2}\b','',claim['text'])
+    numbers=re.findall(r'(?<![A-Za-z])[-+]?\d[\d,]*(?:\.\d+)?',text)
+    for token in numbers:
+        n=float(token.replace(',',''))
+        # Permit faithful display rounding, but no model-generated sums or differences.
+        decimals=len(token.split('.')[1]) if '.' in token else 0
+        tolerance=0.5*(10**(-decimals))+1e-8
+        if not any(abs(v-n)<tolerance for v in values):
+            raise QueryBlocked('A number in the answer is not present in its cited results. Retrieve a calculated total or difference.')
