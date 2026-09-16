@@ -9,6 +9,15 @@ NEXT = pd.Timestamp('2026-09-14')
 BASE = pd.date_range('2026-08-10', periods=4, freq='7D')
 FILES = ['customers', 'services', 'staff_capacity', 'appointments', 'retail_sales', 'customer_followups']
 
+def parse_dates(series):
+    # Excel may rewrite ISO dates as Australian day/month/year strings.
+    text = series.astype('string')
+    slash = text.str.contains('/', na=False)
+    result = pd.Series(pd.NaT, index=series.index, dtype='datetime64[ns]')
+    result.loc[slash] = pd.to_datetime(series.loc[slash], dayfirst=True, format='mixed', errors='raise')
+    result.loc[~slash] = pd.to_datetime(series.loc[~slash], format='mixed', errors='raise')
+    return result
+
 def load_data(root):
     tables = {}
     for name in FILES:
@@ -18,10 +27,10 @@ def load_data(root):
         tables[name] = pd.read_csv(paths[0])
     a, c, s = tables['appointments'], tables['customers'], tables['services']
     for field in ['appointment_start', 'appointment_end', 'booking_created_at', 'cancelled_at', 'completed_at', 'week_start']:
-        a[field] = pd.to_datetime(a[field], errors='raise')
-    c['first_completed_visit_date'] = pd.to_datetime(c['first_completed_visit_date'])
-    tables['staff_capacity']['work_date'] = pd.to_datetime(tables['staff_capacity']['work_date'])
-    tables['customer_followups']['contacted_at'] = pd.to_datetime(tables['customer_followups']['contacted_at'])
+        a[field] = parse_dates(a[field])
+    c['first_completed_visit_date'] = parse_dates(c['first_completed_visit_date'])
+    tables['staff_capacity']['work_date'] = parse_dates(tables['staff_capacity']['work_date'])
+    tables['customer_followups']['contacted_at'] = parse_dates(tables['customer_followups']['contacted_at'])
     s['colour_service'] = s['colour_service'].astype(str).str.lower().eq('true')
     a = a.merge(s[['service_id', 'service_name', 'colour_service', 'service_revenue_per_hour_aud']], on='service_id', validate='many_to_one')
     a = a.merge(c[['customer_id', 'customer_name', 'first_completed_visit_date']], on='customer_id', validate='many_to_one')
@@ -101,6 +110,15 @@ def show_table(frame):
 def money_change(value):
     return f"{'-' if value < 0 else '+'}${abs(value):,.2f}"
 
+
+def setting(name, default=''):
+    import os
+    try:
+        return str(st.secrets.get(name, os.environ.get(name, default)))
+    except FileNotFoundError:
+        return os.environ.get(name, default)
+
+
 def main():
     st.set_page_config(page_title="Adrian | Salon Insights", page_icon='✂', layout='wide')
     st.markdown('''<style>
@@ -116,6 +134,11 @@ def main():
         t = load_data(Path(__file__).resolve().parent)
     except (ValueError, KeyError, OSError) as e:
         st.error(str(e)); st.info('Upload the six source CSVs into Dummy Data in the same repository as app.py.'); st.stop()
+    view = st.radio('View', ['Ask your salon', 'Detailed insights'], horizontal=True)
+    if view == 'Ask your salon':
+        from analyst_ui import render
+        render(t, setting)
+        return
     current = completed(t, [THIS]); base = completed(t, BASE)
     next_a = snapshot(t, NEXT); cap = capacity(t, NEXT)
     b_rev, c_rev = base.service_revenue_aud.sum()/4, current.service_revenue_aud.sum()
@@ -197,7 +220,7 @@ def main():
         st.write('**Next action:** review whether targeted promotion of colouring packages could increase suitable bookings. Start with customers due for colouring, then measure package bookings, utilisation and revenue per hour.')
         st.caption('Revenue per hour is not profit. Product costs and campaign enquiries are absent, so we cannot calculate package margins or prove that promotion will increase demand.')
     with st.expander('How this demo works'):
-        st.write('All results are calculated from the six source CSVs. No AI API, customer messages or database connection is used. The snapshot date is fixed so future bookings are not mistaken for completed revenue.')
+        st.write('All results are calculated from the six source CSVs. The chat proposes read-only SQL over the source data and checks evidence before presenting an explanation. Supabase can store owner-reviewed context when connected. No customer messages are sent. The snapshot date is fixed so future bookings are not mistaken for completed revenue.')
         st.write('Capacity assumes 38 fully bookable hours per staff member per week. Breaks, admin and colour-processing overlaps are not modelled. Service revenue and retail revenue are aggregated separately to prevent double-counting.')
 
 if __name__ == '__main__':
