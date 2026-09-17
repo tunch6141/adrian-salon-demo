@@ -1,8 +1,9 @@
 from pathlib import Path
-import json,os
+import json,os,uuid
 import streamlit as st
 from .adapter import Intake
-from .clarification import questions,ai_extract,proposed,decision,context_note,validate_checkpoint
+from .amendments import money_request,validate_sales
+from .clarification import questions,ai_extract,proposed,decision,context_note,validate_checkpoint,stock_reply
 
 def setting(key):
     try:return str(st.secrets.get(key,os.environ.get(key,'')))
@@ -10,17 +11,17 @@ def setting(key):
 
 def render_chat(intake):
     raw=Path(__file__).with_name('sample_raw')
-    for key,default in [('p1_decisions',[]),('p1_context',[]),('p1_chat',{}),('p1_pending',None)]:st.session_state.setdefault(key,default)
+    for key,default in [('p1_decisions',[]),('p1_context',[]),('p1_chat',{}),('p1_pending',None),('p1_sales',[])]:st.session_state.setdefault(key,default)
     st.subheader('Clarify an issue with the owner')
     st.caption('Confirmed changes apply in this session. Download a checkpoint before leaving; permanent database storage is not connected.')
-    choices={q['id']:q for q in questions(intake)};labels={k:q['label'] for k,q in choices.items()};labels['context']='Record a business event'
+    choices={q['id']:q for q in questions(intake)};labels={k:q['label'] for k,q in choices.items()};labels['context']='Record a business event';labels['sale']='Record a missing sale'
     selected=st.selectbox('What would you like to clarify?',list(labels),format_func=labels.get,key='p1_issue');q=choices.get(selected)
     owner=st.text_input('Name of person confirming',key='p1_owner',placeholder='For example, Adrian')
     st.caption('Self-reported name under the shared demo password; not a separately verified identity.')
     mode=st.radio('Reply method',['AI conversation','Choose the correction directly'],horizontal=True,key='p1_mode')
     key=setting('OPENAI_API_KEY');model=setting('CLARIFICATION_MODEL') or setting('OPENAI_MODEL')
     if mode=='AI conversation' and not(key and model):st.info('AI conversation needs your existing OPENAI_API_KEY and OPENAI_MODEL secrets. Direct correction remains available.')
-    with st.chat_message('assistant'):st.write(q['question'] if q else 'What happened in the business? I will record your explanation separately from calculated facts.')
+    with st.chat_message('assistant'):st.write(q['question'] if q else ('Tell me about the missing sale: staff, date and amount. I will ask you to review the accounting details before recording it.' if selected=='sale' else 'What happened in the business? Explanations stay separate from figures. Missing-sales requests will be reviewed as financial amendments.'))
     history=st.session_state['p1_chat'].setdefault(selected,[])
     for msg in history:
         with st.chat_message(msg['role']):st.write(msg['content'])
@@ -28,11 +29,17 @@ def render_chat(intake):
     if text:
         history.append({'role':'user','content':text});st.session_state['p1_pending']=None
         try:
-            if q is None:parsed={'intent':'context'}
+            if selected=='sale' or money_request(text):parsed={'intent':'transaction'}
+            elif q and q['kind']=='cost' and (local:=stock_reply(q,text)):parsed=local
+            elif q is None:parsed={'intent':'context'}
             elif not(key and model):parsed={'intent':'not_configured'}
             else:
                 with st.spinner('Interpreting your reply…'):parsed=ai_extract(q,history,key,model)
-            if parsed['intent']=='answer':
+            if parsed['intent']=='transaction':
+                st.session_state['p1_pending']={'kind':'sale','text':text,'selected':selected,'token':uuid.uuid4().hex}
+                answer='This describes a possible missing financial transaction, not merely context. Review the sale date, staff, category, tax basis and unique reference below. A cash receipt could also be payment for an existing sale, so check that first.'
+            elif parsed['intent']=='clarify':answer=parsed['message']
+            elif parsed['intent']=='answer':
                 draft=proposed(q,parsed['value'],text);st.session_state['p1_pending']={'kind':'correction','draft':draft,'selected':selected}
                 answer='Proposed change: '+draft['summary']+' Please review before confirming.'
             elif parsed['intent']=='context':
@@ -63,6 +70,9 @@ def render_chat(intake):
                     st.session_state['p1_decisions']=updated;st.session_state['p1_pending']=None;st.session_state.pop('piece1_check_results',None)
                     st.session_state['p1_notice']='Correction confirmed and data reprocessed.';st.rerun()
                 except ValueError as exc:st.error(str(exc))
+        elif pending['kind']=='sale':
+            from .sales_ui import render_sale
+            render_sale(pending,owner)
         else:
             st.write('**Owner-provided event:** '+pending['text'])
             entity=st.selectbox('Who does this concern?',['Salon','Sarah','Matthew','Sam'],key='p1_event_entity')
@@ -74,7 +84,12 @@ def render_chat(intake):
                     st.session_state['p1_notice']='Owner context recorded for this session. No analytical figures changed.';st.rerun()
                 except ValueError as exc:st.error(str(exc))
         if st.button('Discard proposal',key='p1_discard'):st.session_state['p1_pending']=None;st.rerun()
-    checkpoint={'format':'piece1_owner_review_v1','decisions':st.session_state['p1_decisions'],'context':st.session_state['p1_context']}
+    for note in st.session_state['p1_context']:
+        if money_request(note['explanation']):
+            st.warning('A saved context note describes a possible financial correction. Context alone does not change revenue; check the confirmed manual-sales list before adding it: '+note['explanation'])
+            if st.button('Review this note as a missing sale',key='convert:'+note['context_id']):
+                st.session_state['p1_pending']={'kind':'sale','text':note['explanation'],'selected':selected,'token':uuid.uuid4().hex};st.rerun()
+    checkpoint={'format':'piece1_owner_review_v1','decisions':st.session_state['p1_decisions'],'context':st.session_state['p1_context'],'sales':st.session_state['p1_sales']}
     with st.expander('Approved decisions and business context'):
         st.json(checkpoint);st.caption('Retrieval of these notes by the commercial analyst is a later integration step.')
     st.download_button('Download owner-review checkpoint',json.dumps(checkpoint,indent=2),file_name='owner_review_checkpoint.json',mime='application/json')
@@ -83,8 +98,8 @@ def render_chat(intake):
         if upload:
             try:
                 if upload.size>200000:raise ValueError('Checkpoint too large.')
-                ds,ns=validate_checkpoint(json.loads(upload.getvalue()),raw);st.json({'decisions':ds,'context':ns})
+                data=json.loads(upload.getvalue());ds,ns=validate_checkpoint(data,raw);sales=validate_sales(data.get('sales',[]));st.json({'decisions':ds,'context':ns,'sales':sales})
                 st.caption('Restoring replaces this session’s decisions and notes. Review them first.')
                 if st.button('Restore reviewed checkpoint',key='p1_restore_confirm'):
-                    st.session_state['p1_decisions']=ds;st.session_state['p1_context']=ns;st.session_state['p1_pending']=None;st.session_state['p1_chat']={};st.session_state.pop('piece1_check_results',None);st.rerun()
+                    st.session_state['p1_decisions']=ds;st.session_state['p1_context']=ns;st.session_state['p1_sales']=sales;st.session_state['p1_pending']=None;st.session_state['p1_chat']={};st.session_state.pop('piece1_check_results',None);st.rerun()
             except (ValueError,KeyError,TypeError) as exc:st.error('Checkpoint not restored: '+str(exc))

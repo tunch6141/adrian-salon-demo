@@ -10,7 +10,9 @@ def questions(intake):
             raw=i['raw_value'];opts=[{'value':s['staff_id'],'label':s['staff_name']} for s in intake.tables['staff']]
             output.append({'id':'staff:'+i['record_id'],'kind':'staff','label':f'Who is {raw}?','question':f'The booking {i["record_id"]} lists “{raw}”. Does this mean '+', '.join(o['label'] for o in opts)+', or someone else? I will not guess.','record_id':i['record_id'],'raw_value':raw,'options':opts})
         elif i['table']=='inventory_items' and i['field']=='unit_cost' and i['code']=='invalid_value':
-            output.append({'id':'cost:'+i['record_id'],'kind':'cost','label':'Missing stock cost: '+i['record_id'],'question':f'Item {i["record_id"]} has an unknown unit cost. What is its cost in AUD excluding GST? If you do not know, we can leave it unresolved.','record_id':i['record_id'],'raw_value':i['raw_value'],'options':[]})
+            catalog=[{'item_id':r['item_id'],'item_name':r['item_name']} for r in intake.tables['items'] if r['item_type'] in ['product','part']]
+            name=next((r['item_name'] for r in catalog if r['item_id']==i['record_id']),i['record_id'])
+            output.append({'id':'cost:'+i['record_id'],'kind':'cost','label':'Missing cost: '+name+' ('+i['record_id']+')','question':f'The unit cost for {name} ({i["record_id"]}) is unknown. What is the cost of ONE unit in AUD excluding GST? For example, “AUD35”. If you mean another product, tell me its name first.','record_id':i['record_id'],'item_name':name,'catalog':catalog,'raw_value':i['raw_value'],'options':[]})
         elif i['code']=='identity_conflict':
             match=next(r for r in intake.identity if r['source_customer_id']==i['record_id']); customers={r['customer_id']:r for r in intake.tables['customers']}
             opts=[{'value':c,'label':customers[c]['customer_name']+' ('+c+')'} for c in match['candidates']]+[{'value':'new_identity','label':'Keep as a separate customer'}]
@@ -38,7 +40,7 @@ def proposed(question,value,owner_text):
         try:cost=Decimal(str(value))
         except InvalidOperation:raise ValueError('Please give a numeric unit cost.')
         if not cost.is_finite() or cost<0 or cost>Decimal('1000000') or cost.as_tuple().exponent < -2:raise ValueError('Enter a valid unit cost with at most two decimal places.')
-        amounts=[Decimal(t.replace(',','')) for t in re.findall(r'(?<![\w.])\d[\d,]*(?:\.\d+)?',owner_text)]
+        amounts=[Decimal(t.replace(',','')) for t in re.findall(r'(?<![\w.])\d[\d,]*(?:\.\d+)?',re.sub(r'\bAUD(?=\d)','AUD ',owner_text,flags=re.I))]
         if cost not in amounts:raise ValueError('The proposed cost was not stated in your reply. Please state it explicitly.')
         value=format(cost,'f');summary=f'Set item {question["record_id"]} unit cost to AUD {value} excluding GST.'
     else:
@@ -90,3 +92,27 @@ def validate_checkpoint(data,raw):
         safe=context_note(n['explanation'],n['entity'],n['period_start'],n['period_end'],n['source_name'])
         datetime.fromisoformat(n['recorded_at']);safe['recorded_at']=n['recorded_at'];safe['context_id']=str(uuid.UUID(n['context_id']));safe_notes.append(safe)
     return accepted,safe_notes
+
+def stock_reply(question,text):
+    """Grounded stock dialogue for known product references and literal amounts."""
+    catalog=question.get('catalog',[]);current=question['record_id'];name=question.get('item_name',current)
+    if re.search(r'(?:-|minus\s+)(?:AUD\s*|\$\s*)?\d',text,re.I):return {'intent':'clarify','message':'Unit cost cannot be negative. Please check the amount.'}
+    if re.search(r'\b(pack|carton|box|selling price|retail price)\b',text,re.I):return {'intent':'clarify','message':f'I need the cost of ONE {name}, not a pack total or selling price. What is its unit cost in AUD excluding GST?'}
+    words=lambda s:set(re.findall(r'[a-z]{4,}',s.casefold()))
+    for row in catalog:
+        unique=words(row['item_name'])-set().union(*(words(r['item_name']) for r in catalog if r['item_id']!=row['item_id']))
+        mentioned=row['item_name'].casefold() in text.casefold() or bool(unique&words(text)) or re.search(r'\b'+re.escape(row['item_id'])+r'\b',text,re.I)
+        if mentioned and row['item_id']!=current:
+            return {'intent':'clarify','message':f'You mentioned {row["item_name"]} ({row["item_id"]}), but the unresolved cost belongs to {name} ({current}). I have not changed either product. What is the unit cost for {name}, or would you like to leave it unresolved?'}
+    ids=re.findall(r'\bID\s*([A-Za-z0-9-]+)|/([A-Za-z0-9-]+)',text,re.I)
+    for pair in ids:
+        ident=next(x for x in pair if x)
+        if ident.casefold()!=current.casefold():return {'intent':'clarify','message':f'That ID does not match the current item {name} ({current}). Please confirm the product before supplying its unit cost.'}
+    if re.search(r'what.*(?:item|product)|which.*(?:item|product)',text,re.I):return {'intent':'clarify','message':f'The item is {name}, ID {current}. I need its cost per unit in AUD excluding GST.'}
+    if re.search(r"don.?t know|not sure|unknown|maybe|no idea",text,re.I):return {'intent':'clarify','message':f'We can leave {name} unresolved until you have a reliable unit cost. I will not guess.'}
+    cleaned=re.sub(r'\bAUD(?=\d)','AUD ',text,flags=re.I)
+    values=re.findall(r'(?<![\w.])\d[\d,]*(?:\.\d+)?',cleaned)
+    if len(values)==1:
+        return {'intent':'answer','value':values[0].replace(',','')}
+    if len(values)>1:return {'intent':'clarify','message':f'I found more than one number. Please give just the cost of ONE {name}, in AUD excluding GST. Product IDs and pack quantities are not unit costs.'}
+    return None

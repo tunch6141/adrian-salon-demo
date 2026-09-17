@@ -1,6 +1,9 @@
 """Isolated validation UI; consumes raw fixture data, not expected clean answers."""
 from pathlib import Path
 import copy,hmac,json,os,tempfile
+from datetime import date,timedelta
+from .amendments import apply_sales
+from .change_view import render_changes
 import streamlit as st
 from .adapter import Intake
 from .metrics import revenue
@@ -8,7 +11,7 @@ from .metrics import revenue
 def render():
     st.set_page_config(page_title='Piece 1 | Data validation',layout='wide')
     st.title('Piece 1 — Data validation')
-    st.caption('Build P1-UI-2 · Owner clarification chat · Reporting clock: 17 September 2026, 6 pm Melbourne')
+    st.caption('Build P1-UI-3 · Owner clarification chat · Reporting clock: 17 September 2026, 6 pm Melbourne')
     try:password=str(st.secrets.get('DEMO_PASSWORD',os.environ.get('DEMO_PASSWORD','')))
     except (FileNotFoundError,KeyError):password=os.environ.get('DEMO_PASSWORD','')
     if not password:
@@ -22,10 +25,17 @@ def render():
     except Exception as exc:
         st.error(f'Validation data could not load: {type(exc).__name__}: {exc}')
         st.info('Check that the entire piece1_validation folder was uploaded beside app.py.');return
+    baseline=Intake(Path(__file__).with_name('sample_raw'))
+    intake=apply_sales(intake,st.session_state.get('p1_sales',[]))
     person=st.selectbox('Revenue scope',['Sarah','Matthew','Sam','Whole business'])
     staff={'Sarah':'S01','Matthew':'S02','Sam':'S03','Whole business':None}[person]
-    result=revenue(intake,'2026-09-07','2026-09-14',staff)
-    st.subheader('Revenue for 7–13 September 2026')
+    dates=st.columns(2)
+    start=dates[0].date_input('Revenue from',value=date(2026,9,7),min_value=date(2026,6,22),max_value=date(2026,9,16),key='p1_revenue_start')
+    end=dates[1].date_input('Revenue through',value=date(2026,9,13),min_value=date(2026,6,22),max_value=date(2026,9,16),key='p1_revenue_end')
+    if start>end:st.error('The end date must be on or after the start date.');return
+    result=revenue(intake,str(start),str(end+timedelta(days=1)),staff)
+    st.subheader(f'Revenue for {start:%d %b}–{end:%d %b %Y}')
+    st.caption('Select a period containing a correction’s transaction date. A sale on 16 September does not change 7–13 September.')
     if result['status']=='Available':
         columns=st.columns(4)
         for c,label,key in zip(columns,['Service revenue','Retail revenue','Total net revenue','Average transaction value'],['service_revenue','product_revenue','net_revenue','average_transaction_value']):
@@ -42,6 +52,7 @@ def render():
     if notice:=st.session_state.pop('p1_notice',None):st.success(notice)
     from .chat_ui import render_chat
     render_chat(intake)
+    render_changes(baseline,intake,st.session_state.get('p1_context',[]))
     with st.expander('See corrections and identity matches'):
         st.dataframe([{'Table':a['table'],'Row':a['source_row'],'Field':a['field'],'Original':str(a['original']),'Cleaned':str(a['clean']),'Action':a['action']} for a in intake.audit],hide_index=True)
         st.json(intake.identity)
@@ -79,5 +90,5 @@ def render():
         checks=st.session_state['piece1_check_results'];st.dataframe(checks,hide_index=True)
         if all(c['Result']=='PASS' for c in checks):st.success(f"All {len(checks)} deployment checks passed.")
         else:st.error('Some checks failed. Download the report before proceeding.')
-    st.download_button('Download validation report',json.dumps({'build':'P1-UI-2','intake':intake.report(),'revenue':result,'deployment_checks':st.session_state.get('piece1_check_results',[]),'scope':'Data intake and revenue only. Live AI, booking capacity and permanent cloud storage are not tested.'},indent=2),file_name='piece1_validation_report.json',mime='application/json')
+    st.download_button('Download validation report',json.dumps({'build':'P1-UI-3','intake':intake.report(),'revenue':result,'deployment_checks':st.session_state.get('piece1_check_results',[]),'scope':'Data intake and revenue only. Live AI, booking capacity and permanent cloud storage are not tested.'},indent=2),file_name='piece1_validation_report.json',mime='application/json')
     st.info('This page validates Piece 1 only. The original chatbot still uses its original data. Owner-review chat is separate from the commercial analyst. Permanent storage comes later.')
