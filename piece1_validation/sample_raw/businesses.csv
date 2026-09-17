@@ -1,0 +1,2 @@
+business_id,name,industry,timezone,currency,as_of,synthetic
+B001,Adrian Synthetic Salon,salon,Australia/Melbourne,AUD,2026-09-17T18:00:00+10:00,True

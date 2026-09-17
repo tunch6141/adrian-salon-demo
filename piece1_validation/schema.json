@@ -1,0 +1,202 @@
+{
+  "businesses": {
+    "business_id": "text",
+    "name": "text",
+    "industry": "text",
+    "timezone": "text",
+    "currency": "text",
+    "as_of": "text",
+    "synthetic": "boolean"
+  },
+  "customer_profile": {
+    "business_id": "text",
+    "setting": "text",
+    "value": "text",
+    "status": "text"
+  },
+  "capabilities": {
+    "business_id": "text",
+    "module": "text",
+    "entitled": "boolean",
+    "data_health": "text"
+  },
+  "staff": {
+    "business_id": "text",
+    "staff_id": "text",
+    "staff_name": "text",
+    "role": "text"
+  },
+  "customers": {
+    "business_id": "text",
+    "customer_id": "text",
+    "source_customer_id": "text",
+    "customer_name": "text",
+    "mobile": "text",
+    "email": "text",
+    "contact_permission": "text",
+    "owner_next_visit_date": "text",
+    "owner_next_visit_value_ex_gst": "number"
+  },
+  "items": {
+    "business_id": "text",
+    "item_id": "text",
+    "sku": "text",
+    "item_name": "text",
+    "item_type": "text",
+    "default_duration_minutes": "number",
+    "list_price_ex_gst": "number",
+    "unit_cost": "number",
+    "active": "boolean"
+  },
+  "staff_availability": {
+    "business_id": "text",
+    "availability_id": "text",
+    "staff_id": "text",
+    "work_date": "text",
+    "shift_start": "text",
+    "shift_end": "text",
+    "rostered_minutes": "number",
+    "nonbookable_minutes": "number",
+    "bookable_minutes": "number"
+  },
+  "bookings": {
+    "business_id": "text",
+    "booking_id": "text",
+    "customer_id": "text",
+    "staff_id": "text",
+    "appointment_start": "text",
+    "appointment_end": "text",
+    "booking_created_at": "text",
+    "status": "text",
+    "expected_value_ex_gst": "number",
+    "booking_source": "text"
+  },
+  "booking_services": {
+    "business_id": "text",
+    "booking_service_id": "text",
+    "booking_id": "text",
+    "service_id": "text",
+    "staff_id": "text",
+    "duration_minutes": "number"
+  },
+  "booking_history": {
+    "business_id": "text",
+    "event_id": "text",
+    "booking_id": "text",
+    "event_type": "text",
+    "event_at": "text",
+    "status_after": "text",
+    "start_after": "text",
+    "end_after": "text",
+    "staff_id_after": "text",
+    "expected_value_ex_gst_after": "number"
+  },
+  "transactions": {
+    "business_id": "text",
+    "transaction_id": "text",
+    "booking_id": "text",
+    "customer_id": "text",
+    "posted_at": "text",
+    "status": "text",
+    "transaction_type": "text"
+  },
+  "transaction_items": {
+    "business_id": "text",
+    "transaction_item_id": "text",
+    "transaction_id": "text",
+    "item_id": "text",
+    "staff_id": "text",
+    "quantity": "number",
+    "gross_amount_ex_gst": "number",
+    "discount_ex_gst": "number",
+    "refund_ex_gst": "number",
+    "net_amount_ex_gst": "number",
+    "direct_cost": "number",
+    "original_transaction_item_id": "text"
+  },
+  "nonbookable_blocks": {
+    "business_id": "text",
+    "block_id": "text",
+    "staff_id": "text",
+    "start_at": "text",
+    "end_at": "text",
+    "reason": "text",
+    "approved_by": "text",
+    "recorded_at": "text"
+  },
+  "slot_recovery": {
+    "cancelled_booking_id": "text",
+    "replacement_booking_id": "text",
+    "recovered_minutes": "number",
+    "match_basis": "text"
+  },
+  "customer_followups": {
+    "business_id": "text",
+    "followup_id": "text",
+    "customer_id": "text",
+    "contacted_at": "text",
+    "channel": "text",
+    "summary": "text",
+    "outcome": "text",
+    "next_action": "text",
+    "next_action_date": "text",
+    "closed": "boolean"
+  },
+  "business_context": {
+    "business_id": "text",
+    "context_id": "text",
+    "staff_id": "text",
+    "period_start": "text",
+    "period_end": "text",
+    "event_type": "text",
+    "explanation": "text",
+    "source_type": "text",
+    "source_name": "text",
+    "recorded_at": "text",
+    "confirmed": "boolean",
+    "causality_verified": "boolean"
+  },
+  "inventory_movements": {
+    "business_id": "text",
+    "movement_id": "text",
+    "item_id": "text",
+    "occurred_at": "text",
+    "movement_type": "text",
+    "quantity_delta": "number",
+    "unit_cost": "number",
+    "transaction_item_id": "text"
+  },
+  "inventory_items": {
+    "business_id": "text",
+    "item_id": "text",
+    "quantity_on_hand": "number",
+    "unit_cost": "number",
+    "supplier_lead_days": "number",
+    "quantity_on_order": "number",
+    "stock_as_of": "text"
+  },
+  "customer_import_batch": {
+    "source_customer_id": "text",
+    "customer_name": "text",
+    "mobile": "text",
+    "email": "text"
+  },
+  "mapping_rules": {
+    "mapping_id": "text",
+    "entity": "text",
+    "raw_value": "text",
+    "canonical_id": "text",
+    "status": "text",
+    "approved_at": "text"
+  },
+  "audit_log": {
+    "audit_id": "text",
+    "entity": "text",
+    "raw_value": "text",
+    "approved_canonical_id": "text",
+    "recorded_at": "text",
+    "approved_by": "text",
+    "supersedes": "text",
+    "reason": "text"
+  }
+}

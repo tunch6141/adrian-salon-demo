@@ -1,0 +1,4 @@
+business_id,followup_id,customer_id,contacted_at,channel,summary,outcome,next_action,next_action_date,closed
+B001,F177,C0177,2026-09-15T10:00:00+10:00,phone,Synthetic follow-up case,No answer,call,2026-09-22,False
+B001,F179,C0179,2026-09-15T10:00:00+10:00,phone,Synthetic follow-up case,Closed lost,stop,,True
+B001,F180,C0180,2026-09-15T10:00:00+10:00,phone,Synthetic follow-up case,Call back,call,2026-09-22,False

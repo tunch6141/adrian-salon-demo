@@ -1,0 +1,8 @@
+business_id,module,entitled,data_health
+B001,revenue,True,Available
+B001,bookings,True,Available
+B001,customers,True,Available
+B001,staff_capacity,True,Available
+B001,gross_margin,True,Available
+B001,inventory,True,Available
+B001,follow_up,True,Available

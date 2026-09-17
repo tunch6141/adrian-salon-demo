@@ -1,0 +1,5 @@
+business_id,item_id,quantity_on_hand,unit_cost,supplier_lead_days,quantity_on_order,stock_as_of
+B001,P01,11,12,7,0,2026-09-17T18:00:00+10:00
+B001,P02,98,10,7,0,2026-09-17T18:00:00+10:00
+B001,P03,0,16,7,0,2026-09-17T18:00:00+10:00
+B001,P04,1,unknown,,0,2026-09-17T18:00:00+10:00

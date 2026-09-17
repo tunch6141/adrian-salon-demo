@@ -1,0 +1,5 @@
+source_customer_id,customer_name,mobile,email
+IMP01,Client one alternate,+61499000001,alternate@example.invalid
+IMP02,Client two alternate,+61499009999,client002@example.invalid
+IMP03,Synthetic Client 001,,
+IMP04,Conflict,+61499000001,client002@example.invalid

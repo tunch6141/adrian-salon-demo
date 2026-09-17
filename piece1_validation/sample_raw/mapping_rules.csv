@@ -1,0 +1,4 @@
+mapping_id,entity,raw_value,canonical_id,status,approved_at
+MAP1,staff,SARAH,S01,approved,2026-06-20T10:00:00+10:00
+MAP2,staff,Matt,S02,approved,2026-06-20T10:00:00+10:00
+MAP3,staff,Matthew,S02,approved,2026-06-20T10:00:00+10:00
