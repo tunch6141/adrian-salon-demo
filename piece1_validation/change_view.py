@@ -1,35 +1,149 @@
-"""Diff actual canonical records, not a predicted change summary."""
-from .adapter import KEYS
+"""Compare actual canonical records before and after owner decisions."""
 
-def changes(before,after):
-    results=[]
-    for table in ['bookings','inventory_items','customers','transactions','transaction_items','items']:
-        key=KEYS[table];old={r[key]:r for r in before.tables.get(table,[])};new={r[key]:r for r in after.tables.get(table,[])}
-        for ident in sorted(set(old)|set(new)):
-            a=old.get(ident,{});b=new.get(ident,{})
-            for field in sorted(set(a)|set(b)):
-                if a.get(field)!=b.get(field):results.append({'Table':table,'Record':ident,'Field':field,'Before':a.get(field),'After':b.get(field),'Change':'Added record' if ident not in old else 'Updated field'})
-    old={r['source_customer_id']:r for r in before.identity}
-    for r in after.identity:
-        a=old.get(r['source_customer_id'],{})
-        for field in ['status','customer_id']:
-            if a.get(field)!=r.get(field):results.append({'Table':'customer_identity_links','Record':r['source_customer_id'],'Field':field,'Before':a.get(field),'After':r.get(field),'Change':'Approved link'})
+import json
+
+import streamlit as st
+
+from .adapter import KEYS
+from .review_ui import business_zone, display_value, show_rows
+
+
+def changes(before, after):
+    results = []
+
+    tables = [
+        "bookings",
+        "inventory_items",
+        "customers",
+        "transactions",
+        "transaction_items",
+        "items",
+    ]
+
+    for table in tables:
+        key = KEYS[table]
+        old = {r[key]: r for r in before.tables.get(table, [])}
+        new = {r[key]: r for r in after.tables.get(table, [])}
+
+        for identifier in sorted(set(old) | set(new)):
+            original = old.get(identifier, {})
+            current = new.get(identifier, {})
+
+            if identifier not in old:
+                change_type = "Added record"
+            elif identifier not in new:
+                change_type = "Removed record"
+            else:
+                change_type = "Updated field"
+
+            for field in sorted(set(original) | set(current)):
+                if original.get(field) != current.get(field):
+                    results.append(
+                        {
+                            "Table": table,
+                            "Record": identifier,
+                            "Field": field,
+                            "Before": original.get(field),
+                            "After": current.get(field),
+                            "Change": change_type,
+                        }
+                    )
+
+    old_links = {
+        row["source_customer_id"]: row
+        for row in before.identity
+    }
+
+    for row in after.identity:
+        original = old_links.get(row["source_customer_id"], {})
+
+        for field in ["status", "customer_id"]:
+            if original.get(field) != row.get(field):
+                results.append(
+                    {
+                        "Table": "customer_identity_links",
+                        "Record": row["source_customer_id"],
+                        "Field": field,
+                        "Before": original.get(field),
+                        "After": row.get(field),
+                        "Change": "Updated identity link",
+                    }
+                )
+
     return results
 
-def render_changes(before,after,notes):
-    import streamlit as st
-    rows=changes(before,after)
-    st.subheader('Verify changes in the tables')
-    st.caption('Before = cleaned data before owner decisions. After = current session records. Original CSVs remain unchanged. Customer matching changes a link; it does not merge two existing customer records.')
-    if rows:st.dataframe([{k:str(v) if v is not None else 'Unavailable' for k,v in r.items()} for r in rows],hide_index=True)
-    else:st.info('No confirmed record changes yet.')
-    with st.expander('Inspect the current table records'):
-        table=st.selectbox('Table',['inventory_items','bookings','customer_identity_links','customers','transactions','transaction_items','business_context'],key='p1_inspect_table')
-        data=after.identity if table=='customer_identity_links' else (after.tables.get('business_context',[])+notes if table=='business_context' else after.tables.get(table,[]))
-        search=st.text_input('Filter by record ID, name or reference',key='p1_inspect_filter')
-        import json
-        filtered=[r for r in data if not search or search.casefold() in json.dumps(r).casefold()]
-        st.caption(f'{len(filtered)} matching records. Displaying up to 200.')
-        st.dataframe([{k:json.dumps(v) if isinstance(v,(dict,list)) else ('' if v is None else str(v)) for k,v in r.items()} for r in filtered[:200]],hide_index=True)
-    with st.expander('Who approved the changes?'):
-        st.json([a for a in after.audit if a.get('approval')])
+
+def render_changes(before, after, notes):
+    rows = changes(before, after)
+    zone = business_zone(after)
+
+    st.subheader("Verify changes in the tables")
+    st.caption(
+        "Before = cleaned data before owner decisions. "
+        "After = current session records. "
+        "Original CSVs remain unchanged. "
+        "Customer matching changes a link. "
+        "It does not merge two existing customer records."
+    )
+
+    if rows:
+        display_rows = [
+            {
+                key: (
+                    "Unavailable"
+                    if value is None
+                    else display_value(value, zone)
+                )
+                for key, value in row.items()
+            }
+            for row in rows
+        ]
+        st.dataframe(display_rows, hide_index=True)
+    else:
+        st.info("No confirmed record changes yet.")
+
+    with st.expander("Inspect the current table records"):
+        table = st.selectbox(
+            "Table",
+            [
+                "inventory_items",
+                "bookings",
+                "customer_identity_links",
+                "customers",
+                "transactions",
+                "transaction_items",
+                "business_context",
+            ],
+            key="p1_inspect_table",
+        )
+
+        if table == "customer_identity_links":
+            data = after.identity
+        elif table == "business_context":
+            data = after.tables.get("business_context", []) + notes
+        else:
+            data = after.tables.get(table, [])
+
+        search = st.text_input(
+            "Filter by record ID, name or reference",
+            key="p1_inspect_filter",
+        ).strip()
+
+        filtered = [
+            row
+            for row in data
+            if (
+                not search
+                or search.casefold()
+                in json.dumps(row, default=str).casefold()
+            )
+        ]
+
+        st.caption(
+            f"{len(filtered)} matching records. "
+            f"Displaying up to 200. Times shown in {zone.key}."
+        )
+        show_rows(filtered[:200], zone)
+
+    # Approval details remain in the review tables and stored records.
+    # A separate duplicate approval section is intentionally omitted.
