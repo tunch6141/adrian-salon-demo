@@ -8,7 +8,7 @@ from .metrics import revenue
 def render():
     st.set_page_config(page_title='Piece 1 | Data validation',layout='wide')
     st.title('Piece 1 — Data validation')
-    st.caption('Build P1-UI-1 · Synthetic revised dataset · Reporting clock: 17 September 2026, 6 pm Melbourne')
+    st.caption('Build P1-UI-2 · Owner clarification chat · Reporting clock: 17 September 2026, 6 pm Melbourne')
     try:password=str(st.secrets.get('DEMO_PASSWORD',os.environ.get('DEMO_PASSWORD','')))
     except (FileNotFoundError,KeyError):password=os.environ.get('DEMO_PASSWORD','')
     if not password:
@@ -18,7 +18,7 @@ def render():
     if not hmac.compare_digest(entered.encode(),password.encode()):
         st.caption('Enter your existing demo password to continue.');return
     st.write('Check raw-data cleaning and revenue calculations before connecting them to the analyst.')
-    try:intake=Intake(Path(__file__).with_name('sample_raw'))
+    try:intake=Intake(Path(__file__).with_name('sample_raw'),st.session_state.get('p1_decisions',[]))
     except Exception as exc:
         st.error(f'Validation data could not load: {type(exc).__name__}: {exc}')
         st.info('Check that the entire piece1_validation folder was uploaded beside app.py.');return
@@ -38,7 +38,10 @@ def render():
     columns[1].metric('Unresolved issues',len(intake.issues))
     columns[2].metric('Raw booking rows',sum(r['table']=='bookings' for r in intake.raw))
     st.dataframe([{'Table':i['table'],'Record':i.get('record_id'),'Field':i['field'],'Problem':i['code'],'Explanation':i['message']} for i in intake.issues],hide_index=True)
-    st.caption('The staff alias, missing stock cost and conflicting customer match remain unresolved. They do not prevent this revenue calculation.')
+    st.caption('Unresolved issues stay visible until a reviewed correction is confirmed.')
+    if notice:=st.session_state.pop('p1_notice',None):st.success(notice)
+    from .chat_ui import render_chat
+    render_chat(intake)
     with st.expander('See corrections and identity matches'):
         st.dataframe([{'Table':a['table'],'Row':a['source_row'],'Field':a['field'],'Original':str(a['original']),'Cleaned':str(a['clean']),'Action':a['action']} for a in intake.audit],hide_index=True)
         st.json(intake.identity)
@@ -46,8 +49,10 @@ def render():
         st.dataframe([{'Table':t,**h} for t,h in intake.health.items()],hide_index=True)
         st.dataframe(result.get('evidence',[]),hide_index=True)
     st.subheader('Run deployment checks')
-    st.write('These checks exercise the deployed adapter. Expected figures are test assertions, never input to the revenue calculator.')
+    st.write('These checks exercise the untouched fixture independently of your session corrections. Expected figures are test assertions, never input to the revenue calculator.')
     if st.button('Run validation checks',type='primary'):
+        current_intake=intake
+        intake=Intake(Path(__file__).with_name('sample_raw'))
         checks=[]
         def check(label,ok):checks.append({'Check':label,'Result':'PASS' if ok else 'FAIL'})
         sarah=revenue(intake,'2026-09-07','2026-09-14','S01')
@@ -69,9 +74,10 @@ def render():
             with sqlite3.connect(db) as con:count=con.execute('SELECT COUNT(*) FROM batches').fetchone()[0]
         check('Identical imports do not create duplicate snapshots',count==1)
         st.session_state['piece1_check_results']=checks
+        intake=current_intake
     if 'piece1_check_results' in st.session_state:
         checks=st.session_state['piece1_check_results'];st.dataframe(checks,hide_index=True)
         if all(c['Result']=='PASS' for c in checks):st.success(f"All {len(checks)} deployment checks passed.")
         else:st.error('Some checks failed. Download the report before proceeding.')
-    st.download_button('Download validation report',json.dumps({'build':'P1-UI-1','intake':intake.report(),'revenue':result,'deployment_checks':st.session_state.get('piece1_check_results',[]),'scope':'Data intake and revenue only. Live AI, booking capacity and permanent cloud storage are not tested.'},indent=2),file_name='piece1_validation_report.json',mime='application/json')
-    st.info('This page validates Piece 1 only. The original chatbot still uses its original data. Permanent storage and AI integration come later.')
+    st.download_button('Download validation report',json.dumps({'build':'P1-UI-2','intake':intake.report(),'revenue':result,'deployment_checks':st.session_state.get('piece1_check_results',[]),'scope':'Data intake and revenue only. Live AI, booking capacity and permanent cloud storage are not tested.'},indent=2),file_name='piece1_validation_report.json',mime='application/json')
+    st.info('This page validates Piece 1 only. The original chatbot still uses its original data. Owner-review chat is separate from the commercial analyst. Permanent storage comes later.')

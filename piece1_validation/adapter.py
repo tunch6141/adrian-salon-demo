@@ -69,7 +69,7 @@ class Intake:
                 clean={}
                 for field,kind in fields.items():
                     original=raw.get(field);value=original
-                    decision=next((d for d in reversed(self.decisions) if d['table']==table and d['field']==field and str(d['raw_value'])==str(original)),None)
+                    decision=next((d for d in reversed(self.decisions) if d['table']==table and d['field']==field and str(d['raw_value'])==str(original) and (not d.get('record_id') or d['record_id']==key)),None)
                     if decision:
                         value=decision.get('value');self.log(table,n,field,original,value,'owner_approved',decision['reason'],decision)
                     try:
@@ -156,6 +156,18 @@ class Intake:
         for candidate in self.tables.get('customer_import_batch',[]):
             mobile=candidate.get('mobile');email=candidate.get('email')
             hits={r['customer_id'] for r in customers if (mobile and r.get('mobile')==mobile) or (email and r.get('email')==email)}
+            choice=next((d for d in reversed(self.decisions) if d['table']=='customer_import_batch' and d['field']=='customer_id' and d['raw_value']==candidate['source_customer_id']),None)
+            if choice:
+                target=choice['value']
+                if target=='new_identity':
+                    cid='CUS_'+uuid.uuid5(uuid.NAMESPACE_URL,'B001/customer_import_batch/'+candidate['source_customer_id']).hex[:20]
+                    row={f:None for f in SCHEMA['customers']};row.update(candidate);row.update(business_id='B001',customer_id=cid);customers.append(row)
+                elif target in hits:cid=target
+                else:raise ValueError('Owner identity choice must be one of the actual contact matches or new_identity')
+                resolution={'source_customer_id':candidate['source_customer_id'],'status':'owner_confirmed','customer_id':cid,'reason':choice['reason']}
+                self.identity.append(resolution)
+                self.log('customer_import_batch',None,'customer_id',candidate['source_customer_id'],cid,'owner_approved',choice['reason'],choice)
+                continue
             if len(hits)>1:
                 resolution={'source_customer_id':candidate['source_customer_id'],'status':'clarify_conflict','customer_id':None,'candidates':sorted(hits)}
                 self.issue('customer_import_batch',None,None,'identity_conflict','Mobile and email resolve to different identities',record_id=candidate['source_customer_id'])
