@@ -4,3 +4,4 @@ openai>=1.68,<3
 sqlglot>=26,<30
 requests>=2.32,<3
 altair>=6,<7
+supabase
