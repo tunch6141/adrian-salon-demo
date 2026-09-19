@@ -30,15 +30,15 @@ def revenue(intake,start,end,staff_id=None):
             limitations.append({'reason':i['code'],'record_id':i.get('record_id')})
     selected=set()
     asof=datetime.fromisoformat(tables['businesses'][0]['as_of'])
-    known_dates=[datetime.fromisoformat(t['posted_at']).astimezone(ZoneInfo('Australia/Melbourne')).date() for t in tx.values() if t.get('posted_at')]
+    known_dates=[datetime.fromisoformat(t['posted_at']).astimezone(ZoneInfo(tables['businesses'][0]['timezone'])).date() for t in tx.values() if t.get('posted_at')]
     if known_dates and lo<min(known_dates):
         limitations.append({'reason':'period_precedes_available_financial_history','earliest_posting_date':min(known_dates).isoformat()})
-    if hi>asof.astimezone(ZoneInfo('Australia/Melbourne')).date():
+    if hi>asof.astimezone(ZoneInfo(tables['businesses'][0]['timezone'])).date():
         limitations.append({'reason':'period_extends_beyond_reporting_clock','as_of':asof.isoformat()})
     for t in tx.values():
         if not t.get('posted_at'):
             limitations.append({'reason':'unknown_posting_date','record_id':t['transaction_id']});continue
-        instant=datetime.fromisoformat(t['posted_at']);day=instant.astimezone(ZoneInfo('Australia/Melbourne')).date()
+        instant=datetime.fromisoformat(t['posted_at']);day=instant.astimezone(ZoneInfo(tables['businesses'][0]['timezone'])).date()
         if not lo<=day<hi or instant>asof:continue
         if t['transaction_id'] in invalid_docs:
             limitations.append({'reason':'invalid_document','record_id':t['transaction_id']});continue

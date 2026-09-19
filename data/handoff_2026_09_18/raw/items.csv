@@ -1,0 +1,15 @@
+business_id,item_id,sku,item_name,item_type,default_duration_minutes,list_price_ex_gst,unit_cost,active
+B001,SV01,SV01,Haircut,service,60,70,5,True
+B001,SV02,SV02,Colour package,service,120,180,30,True
+B001,P01,P01,Colour care shampoo,product,0,30,12,True
+B001,P02,P02,Slow moving conditioner,product,0,25,10,True
+B001,P03,P03,Popular treatment,product,0,40,16,True
+B001,P04,P04,Specialist colour kit,product,0,90,35,True
+B001,SV03,SV03,Long hair colour package,service,150,220,40,True
+B001,SV04,SV04,Treatment add-on,service,30,45,8,True
+B001,SV05,SV05,Cut and treatment bundle,service,90,100,13,True
+B001,P05,P05,Batch tracked shampoo,product,0,30,10,True
+B001,P06,P06,Batch tracked conditioner,product,0,30,5,True
+B001,P07,P07,Irregular specialist stock,product,0,30,25,True
+B001,P08,P08,No movement sample,product,0,30,8,True
+B001,SV06,SV06,Consultation,service,30,35,0,True

@@ -35,7 +35,9 @@
     "email": "text",
     "contact_permission": "text",
     "owner_next_visit_date": "text",
-    "owner_next_visit_value_ex_gst": "number"
+    "owner_next_visit_value_ex_gst": "number",
+    "default_return_days": "number",
+    "first_completed_visit_date": "text"
   },
   "items": {
     "business_id": "text",
@@ -112,7 +114,8 @@
     "refund_ex_gst": "number",
     "net_amount_ex_gst": "number",
     "direct_cost": "number",
-    "original_transaction_item_id": "text"
+    "original_transaction_item_id": "text",
+    "batch_id": "text"
   },
   "nonbookable_blocks": {
     "business_id": "text",
@@ -154,7 +157,8 @@
     "source_name": "text",
     "recorded_at": "text",
     "confirmed": "boolean",
-    "causality_verified": "boolean"
+    "causality_verified": "boolean",
+    "customer_id": "text"
   },
   "inventory_movements": {
     "business_id": "text",
@@ -164,7 +168,9 @@
     "movement_type": "text",
     "quantity_delta": "number",
     "unit_cost": "number",
-    "transaction_item_id": "text"
+    "transaction_item_id": "text",
+    "batch_id": "text",
+    "reason": "text"
   },
   "inventory_items": {
     "business_id": "text",
@@ -173,7 +179,9 @@
     "unit_cost": "number",
     "supplier_lead_days": "number",
     "quantity_on_order": "number",
-    "stock_as_of": "text"
+    "stock_as_of": "text",
+    "anomaly_suppressed": "boolean",
+    "movement_reliability": "text"
   },
   "customer_import_batch": {
     "source_customer_id": "text",
@@ -198,5 +206,224 @@
     "approved_by": "text",
     "supersedes": "text",
     "reason": "text"
+  },
+  "enquiries": {
+    "business_id": "text",
+    "enquiry_id": "text",
+    "customer_id": "text",
+    "received_at": "text",
+    "source": "text",
+    "service_id": "text"
+  },
+  "service_components": {
+    "business_id": "text",
+    "component_id": "text",
+    "service_id": "text",
+    "component_name": "text",
+    "component_price_ex_gst": "number"
+  },
+  "payments": {
+    "business_id": "text",
+    "payment_id": "text",
+    "invoice_id": "text",
+    "paid_on": "text",
+    "amount": "number"
+  },
+  "insights": {
+    "business_id": "text",
+    "insight_id": "text",
+    "fingerprint": "text",
+    "module": "text",
+    "status": "text",
+    "presented_at": "text",
+    "snoozed_until": "text",
+    "summary": "text",
+    "estimated_impact_ex_gst": "number",
+    "impact_is_estimate": "boolean"
+  },
+  "quotes": {
+    "business_id": "text",
+    "quote_id": "text",
+    "enquiry_id": "text",
+    "customer_id": "text",
+    "staff_id": "text",
+    "service_id": "text",
+    "issued_at": "text",
+    "status": "text",
+    "value_ex_gst": "number",
+    "direct_cost": "number",
+    "expires_on": "text",
+    "source_followup_date": "text",
+    "owner_followup_date": "text",
+    "snoozed_until": "text",
+    "no_more_followup": "boolean",
+    "lost_reason": "text",
+    "linked_transaction_id": "text",
+    "closed_at": "text"
+  },
+  "purchase_orders": {
+    "business_id": "text",
+    "order_id": "text",
+    "supplier_id": "text",
+    "ordered_at": "text",
+    "expected_at": "text",
+    "status": "text"
+  },
+  "price_history": {
+    "business_id": "text",
+    "price_event_id": "text",
+    "service_id": "text",
+    "effective_on": "text",
+    "old_price": "number",
+    "new_price": "number",
+    "event_type": "text",
+    "action_id": "text"
+  },
+  "suppliers": {
+    "business_id": "text",
+    "supplier_id": "text",
+    "supplier_name": "text",
+    "normal_lead_days": "number",
+    "payment_terms_days": "number",
+    "minimum_order_quantity": "number",
+    "currency": "text",
+    "unit_of_measure": "text"
+  },
+  "quote_followups": {
+    "business_id": "text",
+    "quote_followup_id": "text",
+    "quote_id": "text",
+    "contacted_at": "text",
+    "channel": "text",
+    "summary": "text",
+    "outcome": "text",
+    "next_action_date": "text",
+    "attempt": "number",
+    "staff_id": "text"
+  },
+  "actions": {
+    "business_id": "text",
+    "action_id": "text",
+    "insight_id": "text",
+    "customer_id": "text",
+    "action_type": "text",
+    "started_on": "text",
+    "objective": "text",
+    "approved_by": "text",
+    "baseline_json": "text",
+    "status": "text"
+  },
+  "staff_skills": {
+    "business_id": "text",
+    "skill_id": "text",
+    "staff_id": "text",
+    "service_id": "text",
+    "qualified": "boolean"
+  },
+  "services": {
+    "business_id": "text",
+    "service_id": "text",
+    "service_name": "text",
+    "service_family": "text",
+    "default_duration_minutes": "number",
+    "list_price_ex_gst": "number",
+    "direct_cost": "number",
+    "default_return_days": "number"
+  },
+  "quote_versions": {
+    "business_id": "text",
+    "quote_version_id": "text",
+    "quote_id": "text",
+    "version": "number",
+    "created_at": "text",
+    "amount_ex_gst": "number"
+  },
+  "purchase_receipt_items": {
+    "business_id": "text",
+    "receipt_item_id": "text",
+    "receipt_id": "text",
+    "item_id": "text",
+    "quantity": "number",
+    "purchase_unit_cost": "number",
+    "direct_freight_ex_gst": "number",
+    "direct_duty_ex_gst": "number",
+    "direct_other_ex_gst": "number",
+    "unit_of_measure": "text"
+  },
+  "purchase_receipts": {
+    "business_id": "text",
+    "receipt_id": "text",
+    "order_id": "text",
+    "supplier_id": "text",
+    "received_at": "text",
+    "freight_ex_gst": "number",
+    "duty_ex_gst": "number",
+    "other_charges_ex_gst": "number",
+    "currency": "text"
+  },
+  "inventory_batches": {
+    "business_id": "text",
+    "batch_id": "text",
+    "receipt_item_id": "text",
+    "item_id": "text",
+    "supplier_id": "text",
+    "received_at": "text",
+    "received_quantity": "number",
+    "landed_unit_cost": "number"
+  },
+  "vehicles": {
+    "business_id": "text",
+    "vehicle_id": "text",
+    "customer_id": "text",
+    "rego": "text",
+    "make": "text",
+    "model": "text",
+    "next_service_date": "text",
+    "next_service_mileage": "number",
+    "recorded_odometer": "number",
+    "industry_example": "text"
+  },
+  "invoices": {
+    "business_id": "text",
+    "invoice_id": "text",
+    "customer_id": "text",
+    "issued_on": "text",
+    "due_on": "text",
+    "invoice_amount": "number",
+    "currency": "text",
+    "amount_basis": "text",
+    "credit_amount": "number"
+  },
+  "review_checkpoints": {
+    "business_id": "text",
+    "checkpoint_id": "text",
+    "action_id": "text",
+    "reviewed_on": "text",
+    "snapshot_json": "text",
+    "conclusion": "text",
+    "owner_decision": "text",
+    "next_review_date": "text"
+  },
+  "supplier_credits": {
+    "business_id": "text",
+    "supplier_credit_id": "text",
+    "supplier_id": "text",
+    "item_id": "text",
+    "credited_on": "text",
+    "quantity": "number",
+    "amount_ex_gst": "number",
+    "reason": "text"
+  },
+  "pricing_scenarios": {
+    "business_id": "text",
+    "scenario_id": "text",
+    "service_id": "text",
+    "baseline_price": "number",
+    "baseline_volume": "number",
+    "proposed_price": "number",
+    "unit_cost": "number",
+    "spare_bookable_hours": "number",
+    "hours_per_service": "number",
+    "description": "text"
   }
 }

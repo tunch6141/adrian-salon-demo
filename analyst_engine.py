@@ -61,6 +61,19 @@ class Database:
         cap = cap[cap.visit_date.le(ASOF[:10])]
         daily = cap.merge(daily,on=['staff_name','visit_date'],how='left',validate='one_to_one').fillna(0)
         frames['staff_daily'] = daily
+        self._open_frames(frames)
+
+    @classmethod
+    def from_intake(cls, intake):
+        from analytics.views import build_views
+        from analytics.rules import rules_for
+        obj=cls.__new__(cls)
+        obj.intake=intake
+        obj.rules=rules_for(intake)
+        obj._open_frames(build_views(intake))
+        return obj
+
+    def _open_frames(self, frames):
         self.frames=frames
         self.con=sqlite3.connect(':memory:')
         self.schema={}
@@ -99,13 +112,28 @@ class Database:
                 raise QueryBlocked('Each result must derive from database columns.')
         deadline=time.monotonic()+2
         self.con.set_progress_handler(lambda: int(time.monotonic()>deadline),1000)
+        # Prevent SQL SUM/AVG from quietly treating incomplete costs as a full margin.
+        if hasattr(self,'intake'):
+            guarded={'gross_profit','direct_cost','allocated_cost','landed_unit_cost'}
+            columns={c.name for agg in list(tree.find_all(exp.Sum))+list(tree.find_all(exp.Avg)) for c in agg.find_all(exp.Column)} & guarded
+            for col in columns:
+                check=tree.copy()
+                check.set('expressions',[exp.Count(this=exp.Star()).as_('_rows'),exp.Count(this=exp.column(col)).as_('_known')])
+                check.set('order',None)
+                try:
+                    coverage=self.con.execute(check.sql(dialect='sqlite')).fetchall()
+                except sqlite3.Error as exc:
+                    raise QueryBlocked('Cost coverage must be explicit before aggregating margin.') from exc
+                if any(row[0]!=row[1] for row in coverage):
+                    raise QueryBlocked('Cost coverage is incomplete. Show known and missing costs separately; a complete margin is unavailable.')
         cur=self.con.execute(sql)
         rows=cur.fetchmany(501)
         if len(rows)>500:raise QueryBlocked('Result too large. Aggregate or narrow the dates.')
         names=[x[0] for x in cur.description]
         if len(names)!=len(set(names)):raise QueryBlocked('Column aliases must be unique.')
         data=[dict(zip(names,row)) for row in rows]
-        return {'id':hashlib.sha256(sql.encode()).hexdigest()[:12], 'sql':sql,'table':tables[0].name,'rows':data,'row_count':len(data)}
+        revision=getattr(getattr(self,'intake',None),'revision','legacy')
+        return {'snapshot_id':revision,'id':hashlib.sha256((revision+sql).encode()).hexdigest()[:16], 'sql':sql,'table':tables[0].name,'rows':data,'row_count':len(data)}
 
     def close(self):self.con.close()
 
@@ -136,6 +164,9 @@ def validate_chart(results, chart):
 
 def service_diagnostic(db,staff,start,end):
     """Reusable expert analysis, parameterised by people/date; no scenario answers."""
+    if hasattr(db,'intake'):
+        from analytics.diagnostics import staff_diagnostic
+        return staff_diagnostic(db,staff,start,end)
     from datetime import date
     if not staff or not set(staff)<=set(['Sarah','Matthew','Sam']):raise QueryBlocked('Unknown staff in comparison')
     start,end=date.fromisoformat(start).isoformat(),date.fromisoformat(end).isoformat()
@@ -219,6 +250,9 @@ def bind_claim_values(results,claim,periods):
 
 
 def period_diagnostic(db,staff,start,end,comparison_start,comparison_end,divisor=1):
+    if hasattr(db,'intake'):
+        from analytics.diagnostics import period_diagnostic as canonical_period
+        return canonical_period(db,staff,start,end,comparison_start,comparison_end,divisor)
     from datetime import date
     if divisor<1 or divisor>52:raise QueryBlocked('Invalid baseline divisor')
     for value in [start,end,comparison_start,comparison_end]:date.fromisoformat(value)

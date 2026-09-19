@@ -1,0 +1,2 @@
+business_id,vehicle_id,customer_id,rego,make,model,next_service_date,next_service_mileage,recorded_odometer,industry_example
+B001,V001,C0178,SYN001,Synthetic,Test vehicle,2026-10-01,120000,113000,automotive_extension_only

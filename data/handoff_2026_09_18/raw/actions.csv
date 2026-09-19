@@ -1,0 +1,4 @@
+business_id,action_id,insight_id,customer_id,action_type,started_on,objective,approved_by,baseline_json,status
+B001,ACT1,INS0,,purchasing_review,2026-08-01,Reduce excess stock,Adrian,"{""excess_stock_value"":8200}",Monitoring
+B001,ACT2,INS2,C0002,pricing_experiment,2026-08-01,Test preferred pricing,Adrian,"{""discount_pct"":5,""price"":70,""volume"":20}",Completed
+B001,ACT-COLLECT,INS4,C0001,collection_followup,2026-09-17,Review promised invoice payment,Adrian,"{""outstanding_balance"":7400}",Monitoring

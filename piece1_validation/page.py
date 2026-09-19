@@ -11,7 +11,7 @@ from .metrics import revenue
 def render():
     st.set_page_config(page_title='Piece 1 | Data validation',layout='wide')
     st.title('Piece 1 — Data validation')
-    st.caption('Build P1-UI-3 · Owner clarification chat · Reporting clock: 17 September 2026, 6 pm Melbourne')
+    st.caption('Build P1-UI-4 · Expanded 18 September dataset · Shared with the analyst')
     try:password=str(st.secrets.get('DEMO_PASSWORD',os.environ.get('DEMO_PASSWORD','')))
     except (FileNotFoundError,KeyError):password=os.environ.get('DEMO_PASSWORD','')
     if not password:
@@ -21,17 +21,18 @@ def render():
     if not hmac.compare_digest(entered.encode(),password.encode()):
         st.caption('Enter your existing demo password to continue.');return
     st.write('Check raw-data cleaning and revenue calculations before connecting them to the analyst.')
-    try:intake=Intake(Path(__file__).with_name('sample_raw'),st.session_state.get('p1_decisions',[]))
+    from analytics.runtime import load_snapshot, SOURCE
+    try:intake=load_snapshot(st.session_state)
     except Exception as exc:
         st.error(f'Validation data could not load: {type(exc).__name__}: {exc}')
         st.info('Check that the entire piece1_validation folder was uploaded beside app.py.');return
-    baseline=Intake(Path(__file__).with_name('sample_raw'))
-    intake=apply_sales(intake,st.session_state.get('p1_sales',[]))
+    baseline=load_snapshot()
+    st.caption(f'Reporting clock: {intake.asof.isoformat()} · {intake.zone.key}')
     person=st.selectbox('Revenue scope',['Sarah','Matthew','Sam','Whole business'])
     staff={'Sarah':'S01','Matthew':'S02','Sam':'S03','Whole business':None}[person]
     dates=st.columns(2)
-    start=dates[0].date_input('Revenue from',value=date(2026,9,7),min_value=date(2026,6,22),max_value=date(2026,9,16),key='p1_revenue_start')
-    end=dates[1].date_input('Revenue through',value=date(2026,9,13),min_value=date(2026,6,22),max_value=date(2026,9,16),key='p1_revenue_end')
+    start=dates[0].date_input('Revenue from',value=date(2026,9,7),min_value=date(2025,6,2),max_value=date(2026,9,16),key='p1_revenue_start')
+    end=dates[1].date_input('Revenue through',value=date(2026,9,13),min_value=date(2025,6,2),max_value=date(2026,9,16),key='p1_revenue_end')
     if start>end:st.error('The end date must be on or after the start date.');return
     result=revenue(intake,str(start),str(end+timedelta(days=1)),staff)
     st.subheader(f'Revenue for {start:%d %b}–{end:%d %b %Y}')
@@ -90,5 +91,5 @@ def render():
         checks=st.session_state['piece1_check_results'];st.dataframe(checks,hide_index=True)
         if all(c['Result']=='PASS' for c in checks):st.success(f"All {len(checks)} deployment checks passed.")
         else:st.error('Some checks failed. Download the report before proceeding.')
-    st.download_button('Download validation report',json.dumps({'build':'P1-UI-3','intake':intake.report(),'revenue':result,'deployment_checks':st.session_state.get('piece1_check_results',[]),'scope':'Data intake and revenue only. Live AI, booking capacity and permanent cloud storage are not tested.'},indent=2),file_name='piece1_validation_report.json',mime='application/json')
-    st.info('This page validates Piece 1 only. The original chatbot still uses its original data. Owner-review chat is separate from the commercial analyst. Permanent storage comes later.')
+    st.download_button('Download validation report',json.dumps({'build':'P1-UI-4','intake':intake.report(),'revenue':result,'deployment_checks':st.session_state.get('piece1_check_results',[]),'scope':'Data intake and revenue only. Live AI, booking capacity and permanent cloud storage are not tested.'},indent=2),file_name='piece1_validation_report.json',mime='application/json')
+    st.info('Ask your salon and Business evidence now use these same corrected records. Corrections and manual sales are session-only until exported. Context notes change explanations, not figures.')

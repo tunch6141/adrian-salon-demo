@@ -1,0 +1,17 @@
+business_id,setting,value,status
+B001,revenue_basis,ex_gst,handoff_rule
+B001,refund_period,refund_posted_date,fixture_choice
+B001,default_return_days,60,handoff_rule
+B001,late_cancellation_hours,24,handoff_rule
+B001,weekly_baseline_weeks,4,handoff_rule
+B001,monthly_baseline_months,3,handoff_rule
+B001,productive_hour_numerator,net_service_revenue,handoff_rule
+B001,inventory_reorder_rules,coverage_and_known_lead_time,handoff_rule
+B001,closed_followup,suppress_contact_not_proof_of_churn,fixture_choice
+B001,inventory_lookback_days,90,handoff_rule
+B001,inventory_low_stock_days,30,handoff_rule
+B001,inventory_target_days,60,handoff_rule
+B001,quote_followup_days,3,handoff_rule
+B001,adaptive_min_visits,3,fixture_policy
+B001,coverage_start,2025-06-02,fixture_metadata
+B001,dataset_version,handoff_2026_09_18,fixture_metadata

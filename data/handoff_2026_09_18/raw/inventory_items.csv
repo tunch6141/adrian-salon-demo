@@ -1,0 +1,9 @@
+business_id,item_id,quantity_on_hand,unit_cost,supplier_lead_days,quantity_on_order,stock_as_of,anomaly_suppressed,movement_reliability
+B001,P01,11,12,7,0,2026-09-17T18:00:00+10:00,False,unassessed
+B001,P02,98,10,7,0,2026-09-17T18:00:00+10:00,False,unassessed
+B001,P03,0,16,7,0,2026-09-17T18:00:00+10:00,False,unassessed
+B001,P04,1,unknown,,0,2026-09-17T18:00:00+10:00,False,unassessed
+B001,P05,198,10,14,0,2026-09-17T18:00:00+10:00,False,unassessed
+B001,P06,314,5,14,0,2026-09-17T18:00:00+10:00,False,unassessed
+B001,P07,39,25,14,0,2026-09-17T18:00:00+10:00,True,owner_flagged_irregular
+B001,P08,15,8,14,0,2026-09-17T18:00:00+10:00,False,unassessed

@@ -1,0 +1,2 @@
+cancelled_booking_id,replacement_booking_id,recovered_minutes,match_basis
+B00822,B00823,60,exact_same_staff_and_interval

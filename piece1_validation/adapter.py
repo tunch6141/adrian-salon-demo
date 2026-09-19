@@ -5,6 +5,8 @@ from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
 import csv, hashlib, json, re, sqlite3, uuid
 
+from analytics.contracts import EXTENSION_KEYS
+
 SCHEMA=json.loads(Path(__file__).with_name('schema.json').read_text())
 KEYS={
  'businesses':'business_id','staff':'staff_id','customers':'customer_id','items':'item_id',
@@ -15,7 +17,8 @@ KEYS={
  'customer_followups':'followup_id','business_context':'context_id','mapping_rules':'mapping_id',
  'audit_log':'audit_id','customer_import_batch':'source_customer_id',
  'capabilities':'module','customer_profile':'setting','slot_recovery':'cancelled_booking_id'}
-DATES={'appointment_start','appointment_end','booking_created_at','event_at','start_after','end_after','posted_at','shift_start','shift_end','start_at','end_at','occurred_at','contacted_at','recorded_at','approved_at','stock_as_of','as_of'}
+KEYS.update(EXTENSION_KEYS)
+DATES={'received_at','ordered_at','expected_at','issued_at','created_at','closed_at','presented_at','appointment_start','appointment_end','booking_created_at','event_at','start_after','end_after','posted_at','shift_start','shift_end','start_at','end_at','occurred_at','contacted_at','recorded_at','approved_at','stock_as_of','as_of'}
 STATUSES={'booked':'Booked','completed':'Completed','done':'Completed','cancelled':'Cancelled','canceled':'Cancelled','no-show':'No-show','no show':'No-show'}
 CHANNELS={'web app':'online','online':'online','phone':'phone','walk_in':'walk_in','walk-in':'walk_in','sms':'sms','email':'email','website':'website','other':'other'}
 
@@ -33,15 +36,22 @@ def phone(value):
     if s.startswith('04') and len(s)==10:s='+61'+s[1:]
     if not re.fullmatch(r'\+\d{8,15}',s):raise ValueError('Unrecognised phone format')
     return s
-def timestamp(value):
+def timestamp(value, zone="Australia/Melbourne"):
     try:d=datetime.fromisoformat(value)
-    except ValueError:d=datetime.strptime(value,'%d/%m/%Y %H:%M').replace(tzinfo=ZoneInfo('Australia/Melbourne'))
+    except ValueError:d=datetime.strptime(value,'%d/%m/%Y %H:%M').replace(tzinfo=ZoneInfo(zone))
     if d.tzinfo is None:raise ValueError('ISO timestamp must include timezone')
     return d.isoformat()
 
 class Intake:
     def __init__(self,source,decisions=()):
         self.source=Path(source);self.tables={};self.issues=[];self.audit=[];self.lineage=[];self.raw=[];self.headers={};self.identity=[]
+        self.zone='Australia/Melbourne'
+        business_path=self.source/'businesses.csv'
+        if business_path.exists():
+            with business_path.open(encoding='utf-8-sig') as f:
+                business=next(csv.DictReader(f),{})
+                self.zone=business.get('timezone') or self.zone
+                ZoneInfo(self.zone)
         self.decisions=list(decisions)
         for d in self.decisions:
             if not all(d.get(k) for k in ['table','field','raw_value','approved_by','approved_at','reason']):raise ValueError('Every decision requires scope, approver, time and reason')
@@ -94,7 +104,7 @@ class Intake:
     def normalise(self,table,field,kind,value):
         if value is None or str(value).strip()=='':return None
         value=str(value).strip()
-        if field in DATES:return timestamp(value)
+        if field in DATES:return timestamp(value,self.zone)
         if field in {'work_date','period_start','period_end','owner_next_visit_date','next_action_date'}:
             return datetime.strptime(value,'%Y-%m-%d').date().isoformat()
         if field=='email':return value.lower()

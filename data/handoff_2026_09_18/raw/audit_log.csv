@@ -1,0 +1,3 @@
+audit_id,entity,raw_value,approved_canonical_id,recorded_at,approved_by,supersedes,reason
+AUD1,staff_alias,Matt,S03,2026-06-19T10:00:00+10:00,owner,,Initial mapping
+AUD2,staff_alias,Matt,S02,2026-06-20T10:00:00+10:00,owner,AUD1,Correction to approved alias

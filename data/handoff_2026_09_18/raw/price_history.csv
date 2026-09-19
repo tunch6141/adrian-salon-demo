@@ -1,0 +1,2 @@
+business_id,price_event_id,service_id,effective_on,old_price,new_price,event_type,action_id
+B001,PRICE1,SV01,2026-08-01,70,66.5,pricing_experiment,ACT2

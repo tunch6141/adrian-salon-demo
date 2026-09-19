@@ -1,0 +1,7 @@
+business_id,service_id,service_name,service_family,default_duration_minutes,list_price_ex_gst,direct_cost,default_return_days
+B001,SV01,Haircut,Cut,60,70,5,42
+B001,SV02,Colour package,Colour,120,180,30,56
+B001,SV03,Long hair colour package,Colour,150,220,40,56
+B001,SV04,Treatment add-on,Treatment,30,45,8,56
+B001,SV05,Cut and treatment bundle,Cut,90,100,13,42
+B001,SV06,Consultation,Consultation,30,35,0,
