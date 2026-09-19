@@ -31,7 +31,7 @@ def render_result(item):
     if status=='explanation':
         st.info('The app retrieved data but could not verify its written explanation. That does not mean your business question is unanswerable. The tables contain the retrieved figures; the explanation was withheld to avoid presenting an unchecked claim.')
     elif status=='facts_only':
-        st.info('The results were retrieved, but the written explanation did not pass its checks. Showing the calculated results instead.')
+        st.info('The investigation could not complete all its checks. Showing the verified results retrieved so far.')
         for result in item['results']:
             if result['table']=='approved_period_comparison':
                 for row in result['rows']:

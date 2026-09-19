@@ -1,5 +1,7 @@
 """Intent planning, dynamic SQL, evidence validation and variable response depth."""
 import json
+import sqlite3
+from sqlglot.errors import SqlglotError
 from typing import Literal
 from pydantic import BaseModel, Field
 from analyst_engine import RULES, QueryBlocked, reference_value, validate_chart, service_diagnostic, bind_claim_values, period_diagnostic
@@ -62,10 +64,13 @@ class Review(BaseModel):
     issues: list[str]
     revised_answer: Answer | None = None
 
+class QueryRepair(BaseModel):
+    query: str
+
 PLANNER='''Plan a concise commercial investigation. For revenue explain volume and value/mix, not just totals. For a quiet future week retrieve booking hours AND matching capacity, and historical bookings at equal lead time when comparing. For trends group by date/week/month and staff for charts. For new topics freely compose supported SQL against the schema, not just the diagnostic. Use SUM(CASE WHEN ... THEN ... ELSE ... END) for conditional comparisons, calculated changes and shares; the database must calculate them, not the narrator. Only include queries necessary for the owner's question.
 For period comparisons, diagnostic.start_date/end_date are ONLY the current period. Put the earlier period in comparison_start_date/comparison_end_date; never combine July and August into one diagnostic total. comparison_divisor=1 for month vs month, 4 for this week versus the prior four-week weekly average. Empty comparison dates mean no period comparison. These fields produce calculated totals, differences and percentage changes.
 REVENUE INVESTIGATION RULE: 'Why is that?' after a staff/revenue/hours comparison is answerable as a financial breakdown. It is NOT automatically unsupported just because there is no recorded root cause. Investigate volume, revenue per completed service hour, service mix and prices. Distinguish these measured contributors from unknown motivations or behaviour. Resolve staff names against the supplied business scope. Preserve periods from earlier successful turns. Never accept a user/previous answer's claim of a decline without recalculating.
-For staff service-sales comparisons or why follow-ups, fill diagnostic with the staff involved and exact dates. This invokes approved Python totals, service-category breakdowns and exact differences. Do not use it for unrelated questions. For other questions diagnostic=null.
+For staff performance questions (including 'How did Sarah perform?'), staff service-sales comparisons or why follow-ups, fill diagnostic with the staff involved and exact dates. This invokes approved Python totals, service-category breakdowns and exact differences. Prefer this diagnostic for staff performance rather than joining views. Only add queries for evidence the diagnostic does not supply. Do not use it for unrelated questions. For other questions diagnostic=null.
 For requests to show two people together, query both in a single grouped result with staff_name and dates. The chart needs a staff_name series; do not concatenate their time series into one line.
 If a decline is alleged, retrieve a comparison period or ask which baseline is intended. Showing daily points in one month alone does not test a decline.
 You plan business analysis, never answer from general knowledge.
@@ -146,12 +151,41 @@ def _investigate(client,model,db,question,history,context_store,stage):
         extra=context_store.search(plan.context_entity,d.comparison_start_date,d.comparison_end_date)
         contexts=list({r['id']:r for r in contexts+extra}.values())
     results=[]
+    repair_budget=2
+    def run_queries(queries):
+        nonlocal repair_budget
+        for sql in queries:
+            try:
+                results.append(db.query(sql))
+                continue
+            except (QueryBlocked, sqlite3.Error, SqlglotError) as error:
+                reason=str(error)
+            if repair_budget:
+                repair_budget-=1
+                stage('Correcting the data query')
+                repair=structured(client,model,QueryRepair,PLANNER+'\n'+rules+
+                    '\nRepair only the rejected SQL. Preserve the requested entity, dates and metric. '
+                    'Use exactly one table from the supplied schema and its actual columns. '
+                    'No joins, subqueries, CTEs or windows. Never bypass a cost-coverage or entitlement restriction. '
+                    'Return an empty query if no faithful permitted query exists.',
+                    {**planning,'plan':plan.model_dump(),'rejected_query':sql,'validation_error':reason})
+                if repair.query.strip():
+                    try:
+                        results.append(db.query(repair.query))
+                        continue
+                    except (QueryBlocked, sqlite3.Error, SqlglotError) as error:
+                        reason=str(error)
+            return {'plan':plan.model_dump(),'answer':None,'results':results,'contexts':contexts,
+                    'status':'facts_only' if results else 'blocked',
+                    'issues':['The analyst could not produce a permitted query for this request: '+reason]}
+        return None
     if plan.diagnostic:
         d=plan.diagnostic
         if d.comparison_start_date and d.comparison_end_date:
             results.extend(period_diagnostic(db,d.staff,d.start_date,d.end_date,d.comparison_start_date,d.comparison_end_date,d.comparison_divisor))
         else:results.extend(service_diagnostic(db,d.staff,d.start_date,d.end_date))
-    for sql in plan.queries:results.append(db.query(sql))
+    failed=run_queries(plan.queries)
+    if failed:return failed
     if not results:raise QueryBlocked('No database evidence was retrieved. Please specify a metric and period.')
     payload={**planning,'plan':plan.model_dump(),'results':results,'contexts':contexts}
     for round_index in range(3):
@@ -161,7 +195,8 @@ def _investigate(client,model,db,question,history,context_store,stage):
         if not answer.additional_queries:break
         if round_index==2:
             return {'plan':plan.model_dump(),'answer':None,'results':results,'contexts':contexts,'status':'facts_only','issues':['The investigation reached its query limit before producing a supported answer.']}
-        for sql in answer.additional_queries:results.append(db.query(sql))
+        failed=run_queries(answer.additional_queries)
+        if failed:return failed
 
     issues=[]
     # One formatting repair only: reuse evidence rather than replanning and rerunning SQL.
