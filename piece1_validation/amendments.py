@@ -48,7 +48,7 @@ def apply_sales(intake,rows):
         if tid in existing:
             if applied.get(tid)!=s:raise ValueError('Existing sale ID has different or unverified contents. Reconcile it before applying an amendment.')
             continue
-        posted=datetime.combine(date.fromisoformat(s['sale_date']),datetime.min.time(),ZoneInfo('Australia/Melbourne')).isoformat()
+        posted=datetime.combine(date.fromisoformat(s['sale_date']),datetime.min.time(),ZoneInfo(intake.tables['businesses'][0]['timezone'])).isoformat()
         intake.tables['items'].append({'business_id':'B001','item_id':iid,'sku':None,'item_name':s['description'],'item_type':s['item_type'],'default_duration_minutes':None,'list_price_ex_gst':s['net_amount_ex_gst'],'unit_cost':None,'active':True})
         intake.tables['transactions'].append({'business_id':'B001','transaction_id':tid,'booking_id':None,'customer_id':None,'posted_at':posted,'status':'Posted','transaction_type':'Sale','source_type':s['source_type'],'source_reference':s['source_reference'],'date_precision':'day'})
         intake.tables['transaction_items'].append({'business_id':'B001','transaction_item_id':lid,'transaction_id':tid,'item_id':iid,'staff_id':s['staff_id'],'quantity':'1','gross_amount_ex_gst':s['net_amount_ex_gst'],'discount_ex_gst':'0','refund_ex_gst':'0','net_amount_ex_gst':s['net_amount_ex_gst'],'direct_cost':None,'original_transaction_item_id':None})

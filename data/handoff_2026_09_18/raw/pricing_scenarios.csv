@@ -1,0 +1,5 @@
+business_id,scenario_id,service_id,baseline_price,baseline_volume,proposed_price,unit_cost,spare_bookable_hours,hours_per_service,description
+B001,PRICE-5-0,SV01,70,20,66.5,5,0,1,"Synthetic feasibility input, not an approved change"
+B001,PRICE-5-20,SV01,70,20,66.5,5,20,1,"Synthetic feasibility input, not an approved change"
+B001,PRICE-10-0,SV01,70,20,63.0,5,0,1,"Synthetic feasibility input, not an approved change"
+B001,PRICE-10-20,SV01,70,20,63.0,5,20,1,"Synthetic feasibility input, not an approved change"

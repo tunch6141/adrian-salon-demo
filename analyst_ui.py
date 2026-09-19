@@ -37,6 +37,7 @@ def render_result(item):
                 for row in result['rows']:
                     if row['metric']=='service_revenue_aud':
                         change=row['difference']
+                        if change is None:continue
                         direction='higher' if change>0 else 'lower' if change<0 else 'unchanged'
                         divisor=row['baseline_divisor']
                         baseline_label='total' if divisor==1 else f'total divided by {divisor:g}'
@@ -135,7 +136,7 @@ def context_form(store):
 
 def render(t,setting):
     st.subheader('Ask your salon')
-    st.caption('Version 4.2 · Calculated answers · Period comparisons · Request timing')
+    st.caption('Version 5 · Handoff 18 September · Shared corrected data')
     key,model,password=setting('OPENAI_API_KEY'),setting('OPENAI_MODEL'),setting('DEMO_PASSWORD')
     if not (key and model and password):
         st.info('Add OPENAI_API_KEY, OPENAI_MODEL and DEMO_PASSWORD in Streamlit Secrets.');return
@@ -144,7 +145,14 @@ def render(t,setting):
         st.caption('Enter the demo password to continue.');return
     rows=st.session_state.setdefault('context_rows',[])
     store=ContextStore(setting('SUPABASE_URL'),setting('SUPABASE_SERVICE_ROLE_KEY'),rows)
+    if hasattr(t,'tables'):
+        from analytics.runtime import CombinedContextStore
+        store=CombinedContextStore(t,store)
     if not store.persistent:st.info('Context is session-only until Supabase is connected. It will not survive a reboot or a new browser session.')
+    revision=getattr(t,'revision','legacy')
+    if st.session_state.get('analyst_data_revision') != revision:
+        st.session_state['v4_turns']=[]
+        st.session_state['analyst_data_revision']=revision
     turns=st.session_state.setdefault('v4_turns',[])
     if st.button('New conversation'):
         st.session_state.v4_turns=[]
@@ -162,7 +170,7 @@ def render(t,setting):
         db=None
         try:
             with st.status('Investigating your question…',expanded=True) as progress:
-                db=Database(t)
+                db=Database.from_intake(t) if hasattr(t,'tables') else Database(t)
                 history=[{'question':x['question'],'plan':x['result']['plan'],'answer':x['result']['answer'],'status':x['result']['status']} for x in turns[-5:]]
                 # History is only interpretation context; each answer retrieves fresh database evidence.
                 result=investigate(OpenAI(api_key=key,timeout=60,max_retries=0),model,db,question.strip(),history,store,on_stage=lambda stage: progress.update(label=stage))
@@ -172,9 +180,11 @@ def render(t,setting):
                     st.session_state.draft_id=str(uuid.uuid4())
             st.rerun()
         except QueryBlocked as e:st.warning(str(e))
-        except Exception:
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error('Analyst request failed: %s', type(exc).__name__)
             st.error('The investigation could not complete. No answer or context was saved for this request. Check model access, API limits and context connection, then retry with a narrower question.')
         finally:
             if db:db.close()
     context_form(store)
-    st.caption('Answers use demo data as at 13 September 2026. Queries are read-only. Evidence review reduces errors but cannot guarantee correctness.')
+    st.caption(f'Answers use the reporting clock {t.asof.isoformat() if hasattr(t, "asof") else "legacy"}. Queries are read-only. Source context is owner-reported, not established cause.')

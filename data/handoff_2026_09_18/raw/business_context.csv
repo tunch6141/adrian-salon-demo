@@ -1,0 +1,5 @@
+business_id,context_id,staff_id,period_start,period_end,event_type,explanation,source_type,source_name,recorded_at,confirmed,causality_verified,customer_id
+B001,CTX1,S01,2026-09-08,2026-09-09,annual_leave,Sarah had two days of approved annual leave.,owner_reported,Adrian,2026-09-14T09:00:00+10:00,True,False,
+B001,CTX2,S01,2026-09-07,2026-09-13,owner_observation,Owner noticed fewer colour packages. No reason for the change was established.,owner_reported,Adrian,2026-09-14T09:00:00+10:00,True,False,
+B001,CTX-STRATEGY,,2026-08-01,2026-10-01,commercial_hypothesis,Owner believes this customer has strategic potential and approved a five percent pricing trial. This is a human hypothesis.,owner_reported,Adrian,2026-08-01T09:00:00+10:00,True,False,C0002
+B001,CTX-COLLECTION,,2026-09-17,2026-09-25,collection_promise,"Customer promised to pay the remaining invoice balance on 25 September. Owner-reported promise, not a cash forecast.",owner_reported,Adrian,2026-09-17T09:00:00+10:00,True,False,C0001

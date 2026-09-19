@@ -1,0 +1,6 @@
+business_id,insight_id,fingerprint,module,status,presented_at,snoozed_until,summary,estimated_impact_ex_gst,impact_is_estimate
+B001,INS0,stock:P06:excess,inventory,Monitoring,2026-08-01T09:00:00+10:00,,Synthetic commercial review,500,True
+B001,INS1,inventory:P07:irregular,inventory,Snoozed,2026-08-01T09:00:00+10:00,2026-10-01,Synthetic commercial review,500,True
+B001,INS2,pricing:SV01:test,pricing,Dismissed,2026-08-01T09:00:00+10:00,,Synthetic commercial review,500,True
+B001,INS3,capacity:next_week,staff_capacity,New,2026-08-01T09:00:00+10:00,,Synthetic commercial review,500,True
+B001,INS4,receivables:C0001:late,receivables,Monitoring,2026-09-17T09:00:00+10:00,,Payment later than customer history,,False

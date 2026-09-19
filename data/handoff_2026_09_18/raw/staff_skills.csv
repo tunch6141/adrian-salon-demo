@@ -1,0 +1,4 @@
+business_id,skill_id,staff_id,service_id,qualified
+B001,S01SV02,S01,SV02,True
+B001,S02SV01,S02,SV01,True
+B001,S03SV03,S03,SV03,True

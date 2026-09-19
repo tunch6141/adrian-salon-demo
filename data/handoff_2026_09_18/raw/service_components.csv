@@ -1,0 +1,5 @@
+business_id,component_id,service_id,component_name,component_price_ex_gst
+B001,SV02-Colour,SV02,Colour,
+B001,SV02-Cut,SV02,Cut,
+B001,SV05-SV01,SV05,SV01,65
+B001,SV05-SV04,SV05,SV04,35

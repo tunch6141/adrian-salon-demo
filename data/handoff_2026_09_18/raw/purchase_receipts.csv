@@ -1,0 +1,5 @@
+business_id,receipt_id,order_id,supplier_id,received_at,freight_ex_gst,duty_ex_gst,other_charges_ex_gst,currency
+B001,PR1,POPR1,SUP1,2026-06-15T08:00:00+10:00,30,0,0,AUD
+B001,PR2,POPR2,SUP2,2026-07-15T08:00:00+10:00,60,0,0,AUD
+B001,PR3,POPR3,SUP1,2026-08-15T08:00:00+10:00,24,0,0,AUD
+B001,PR4,POPR4,SUP2,2026-09-10T08:00:00+10:00,50,0,0,AUD

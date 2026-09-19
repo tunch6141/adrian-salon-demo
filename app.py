@@ -21,7 +21,8 @@ def parse_dates(series):
 def load_data(root):
     tables = {}
     for name in FILES:
-        paths = list(Path(root).rglob(name + '.csv'))
+        paths = [Path(root) / 'Dummy Data' / (name + '.csv')]
+        paths = [p for p in paths if p.is_file()]
         if len(paths) != 1:
             raise ValueError(f'Expected one {name}.csv below the app folder, found {len(paths)}. Keep one copy of each source CSV in Dummy Data or beside app.py.')
         tables[name] = pd.read_csv(paths[0])
@@ -129,16 +130,22 @@ def main():
     </style>''', unsafe_allow_html=True)
     st.caption('ADRIAN’S SALON · BUSINESS INSIGHTS')
     st.title('Know what changed. Decide what to do.')
-    st.caption('Fictional demo · As at Sunday 13 September 2026 · All amounts AUD, GST-exclusive')
+    st.caption('Synthetic demo · Handoff specification 18 September 2026')
+    view = st.radio('View', ['Ask your salon', 'Business evidence', 'Legacy demo'], horizontal=True)
+    if view == 'Ask your salon':
+        from analyst_ui import render
+        from analytics.runtime import load_snapshot
+        render(load_snapshot(st.session_state), setting)
+        return
+    if view == 'Business evidence':
+        from analytics.dashboard import render
+        render(setting)
+        return
+    st.info('Archived six-CSV demo, as at 13 September 2026. It does not use current corrections. Use Ask your salon or Business evidence for the expanded data.')
     try:
         t = load_data(Path(__file__).resolve().parent)
     except (ValueError, KeyError, OSError) as e:
-        st.error(str(e)); st.info('Upload the six source CSVs into Dummy Data in the same repository as app.py.'); st.stop()
-    view = st.radio('View', ['Ask your salon', 'Detailed insights'], horizontal=True)
-    if view == 'Ask your salon':
-        from analyst_ui import render
-        render(t, setting)
-        return
+        st.error(str(e)); st.stop()
     current = completed(t, [THIS]); base = completed(t, BASE)
     next_a = snapshot(t, NEXT); cap = capacity(t, NEXT)
     b_rev, c_rev = base.service_revenue_aud.sum()/4, current.service_revenue_aud.sum()

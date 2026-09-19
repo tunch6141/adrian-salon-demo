@@ -1,0 +1,2 @@
+business_id,supplier_credit_id,supplier_id,item_id,credited_on,quantity,amount_ex_gst,reason
+B001,SC1,SUP1,P06,2026-09-01,5,25,accepted returned stock

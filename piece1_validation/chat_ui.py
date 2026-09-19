@@ -32,7 +32,7 @@ def setting(key):
 
 
 def render_chat(intake):
-    raw = Path(__file__).with_name("sample_raw")
+    raw = intake.source
 
     defaults = [
         ("p1_decisions", []),
@@ -374,8 +374,8 @@ def render_chat(intake):
         review_tables(checkpoint, business_zone(intake))
         st.caption(
             "Business context preserves the owner's explanation. "
-            "Connecting these notes to the commercial analyst "
-            "is still a separate integration step."
+            "Ask your salon can retrieve these notes for the relevant "
+            "entity and dates in this session."
         )
 
     st.download_button(

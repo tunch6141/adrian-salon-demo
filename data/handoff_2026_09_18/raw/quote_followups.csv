@@ -1,0 +1,37 @@
+business_id,quote_followup_id,quote_id,contacted_at,channel,summary,outcome,next_action_date,attempt,staff_id
+B001,Q001-F1,Q001,2026-07-06T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S02
+B001,Q002-F1,Q002,2026-07-08T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S03
+B001,Q002-F2,Q002,2026-07-11T09:00:00+10:00,phone,Synthetic quote review,discussed,,2,S03
+B001,Q004-F1,Q004,2026-07-12T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S02
+B001,Q005-F1,Q005,2026-07-14T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S03
+B001,Q005-F2,Q005,2026-07-17T09:00:00+10:00,phone,Synthetic quote review,discussed,,2,S03
+B001,Q007-F1,Q007,2026-07-18T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S02
+B001,Q008-F1,Q008,2026-07-20T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S03
+B001,Q008-F2,Q008,2026-07-23T09:00:00+10:00,phone,Synthetic quote review,discussed,,2,S03
+B001,Q010-F1,Q010,2026-07-24T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S02
+B001,Q011-F1,Q011,2026-07-26T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S03
+B001,Q011-F2,Q011,2026-07-29T09:00:00+10:00,phone,Synthetic quote review,discussed,,2,S03
+B001,Q013-F1,Q013,2026-07-30T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S02
+B001,Q014-F1,Q014,2026-08-01T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S03
+B001,Q014-F2,Q014,2026-08-04T09:00:00+10:00,phone,Synthetic quote review,discussed,,2,S03
+B001,Q016-F1,Q016,2026-08-05T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S02
+B001,Q017-F1,Q017,2026-08-07T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S03
+B001,Q017-F2,Q017,2026-08-10T09:00:00+10:00,phone,Synthetic quote review,discussed,,2,S03
+B001,Q019-F1,Q019,2026-08-11T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S02
+B001,Q020-F1,Q020,2026-08-13T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S03
+B001,Q020-F2,Q020,2026-08-16T09:00:00+10:00,phone,Synthetic quote review,discussed,,2,S03
+B001,Q022-F1,Q022,2026-08-17T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S02
+B001,Q023-F1,Q023,2026-08-19T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S03
+B001,Q023-F2,Q023,2026-08-22T09:00:00+10:00,phone,Synthetic quote review,discussed,,2,S03
+B001,Q025-F1,Q025,2026-08-23T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S02
+B001,Q026-F1,Q026,2026-08-25T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S03
+B001,Q026-F2,Q026,2026-08-28T09:00:00+10:00,phone,Synthetic quote review,discussed,,2,S03
+B001,Q028-F1,Q028,2026-08-29T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S02
+B001,Q029-F1,Q029,2026-08-31T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S03
+B001,Q029-F2,Q029,2026-09-03T09:00:00+10:00,phone,Synthetic quote review,discussed,,2,S03
+B001,Q031-F1,Q031,2026-09-04T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S02
+B001,Q032-F1,Q032,2026-09-06T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S03
+B001,Q032-F2,Q032,2026-09-09T09:00:00+10:00,phone,Synthetic quote review,discussed,,2,S03
+B001,Q034-F1,Q034,2026-09-10T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S02
+B001,Q035-F1,Q035,2026-09-12T09:00:00+10:00,phone,Synthetic quote review,no answer,,1,S03
+B001,Q035-F2,Q035,2026-09-15T09:00:00+10:00,phone,Synthetic quote review,discussed,,2,S03

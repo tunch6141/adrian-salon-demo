@@ -1,0 +1,4 @@
+business_id,checkpoint_id,action_id,reviewed_on,snapshot_json,conclusion,owner_decision,next_review_date
+B001,CHK0,ACT1,2026-08-15,"{""excess_stock_value"": 7100}",Observed reduction after purchasing review; causation not established,Continue,2026-09-01
+B001,CHK1,ACT1,2026-09-01,"{""excess_stock_value"": 5900}",Observed reduction after purchasing review; causation not established,Continue,2026-10-01
+B001,CHK-COLLECT,ACT-COLLECT,,{},,Review on promised date,2026-09-25

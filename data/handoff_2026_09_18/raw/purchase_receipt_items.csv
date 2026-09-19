@@ -1,0 +1,9 @@
+business_id,receipt_item_id,receipt_id,item_id,quantity,purchase_unit_cost,direct_freight_ex_gst,direct_duty_ex_gst,direct_other_ex_gst,unit_of_measure
+B001,PR1P05,PR1,P05,100,10,0,0,0,bottle
+B001,PR1P06,PR1,P06,100,5,0,0,0,bottle
+B001,PR2P05,PR2,P05,100,9,0,0,0,bottle
+B001,PR2P06,PR2,P06,100,5,0,0,0,bottle
+B001,PR3P05,PR3,P05,20,12,0,0,0,bottle
+B001,PR3P06,PR3,P06,20,5,0,0,0,bottle
+B001,PR4P05,PR4,P05,100,10,0,0,0,bottle
+B001,PR4P06,PR4,P06,100,5,0,0,0,bottle

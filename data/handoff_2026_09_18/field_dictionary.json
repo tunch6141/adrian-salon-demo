@@ -1,0 +1,1717 @@
+[
+  {
+    "table": "actions",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "actions",
+    "field": "action_id",
+    "nullable": false
+  },
+  {
+    "table": "actions",
+    "field": "insight_id",
+    "nullable": false
+  },
+  {
+    "table": "actions",
+    "field": "customer_id",
+    "nullable": true
+  },
+  {
+    "table": "actions",
+    "field": "action_type",
+    "nullable": false
+  },
+  {
+    "table": "actions",
+    "field": "started_on",
+    "nullable": false
+  },
+  {
+    "table": "actions",
+    "field": "objective",
+    "nullable": false
+  },
+  {
+    "table": "actions",
+    "field": "approved_by",
+    "nullable": false
+  },
+  {
+    "table": "actions",
+    "field": "baseline_json",
+    "nullable": false
+  },
+  {
+    "table": "actions",
+    "field": "status",
+    "nullable": false
+  },
+  {
+    "table": "audit_log",
+    "field": "audit_id",
+    "nullable": false
+  },
+  {
+    "table": "audit_log",
+    "field": "entity",
+    "nullable": false
+  },
+  {
+    "table": "audit_log",
+    "field": "raw_value",
+    "nullable": false
+  },
+  {
+    "table": "audit_log",
+    "field": "approved_canonical_id",
+    "nullable": false
+  },
+  {
+    "table": "audit_log",
+    "field": "recorded_at",
+    "nullable": false
+  },
+  {
+    "table": "audit_log",
+    "field": "approved_by",
+    "nullable": false
+  },
+  {
+    "table": "audit_log",
+    "field": "supersedes",
+    "nullable": true
+  },
+  {
+    "table": "audit_log",
+    "field": "reason",
+    "nullable": false
+  },
+  {
+    "table": "booking_history",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "booking_history",
+    "field": "event_id",
+    "nullable": false
+  },
+  {
+    "table": "booking_history",
+    "field": "booking_id",
+    "nullable": false
+  },
+  {
+    "table": "booking_history",
+    "field": "event_type",
+    "nullable": false
+  },
+  {
+    "table": "booking_history",
+    "field": "event_at",
+    "nullable": false
+  },
+  {
+    "table": "booking_history",
+    "field": "status_after",
+    "nullable": false
+  },
+  {
+    "table": "booking_history",
+    "field": "start_after",
+    "nullable": false
+  },
+  {
+    "table": "booking_history",
+    "field": "end_after",
+    "nullable": false
+  },
+  {
+    "table": "booking_history",
+    "field": "staff_id_after",
+    "nullable": false
+  },
+  {
+    "table": "booking_history",
+    "field": "expected_value_ex_gst_after",
+    "nullable": false
+  },
+  {
+    "table": "booking_services",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "booking_services",
+    "field": "booking_service_id",
+    "nullable": false
+  },
+  {
+    "table": "booking_services",
+    "field": "booking_id",
+    "nullable": false
+  },
+  {
+    "table": "booking_services",
+    "field": "service_id",
+    "nullable": false
+  },
+  {
+    "table": "booking_services",
+    "field": "staff_id",
+    "nullable": false
+  },
+  {
+    "table": "booking_services",
+    "field": "duration_minutes",
+    "nullable": false
+  },
+  {
+    "table": "bookings",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "bookings",
+    "field": "booking_id",
+    "nullable": false
+  },
+  {
+    "table": "bookings",
+    "field": "customer_id",
+    "nullable": false
+  },
+  {
+    "table": "bookings",
+    "field": "staff_id",
+    "nullable": false
+  },
+  {
+    "table": "bookings",
+    "field": "appointment_start",
+    "nullable": false
+  },
+  {
+    "table": "bookings",
+    "field": "appointment_end",
+    "nullable": false
+  },
+  {
+    "table": "bookings",
+    "field": "booking_created_at",
+    "nullable": false
+  },
+  {
+    "table": "bookings",
+    "field": "status",
+    "nullable": false
+  },
+  {
+    "table": "bookings",
+    "field": "expected_value_ex_gst",
+    "nullable": false
+  },
+  {
+    "table": "bookings",
+    "field": "booking_source",
+    "nullable": false
+  },
+  {
+    "table": "business_context",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "business_context",
+    "field": "context_id",
+    "nullable": false
+  },
+  {
+    "table": "business_context",
+    "field": "staff_id",
+    "nullable": true
+  },
+  {
+    "table": "business_context",
+    "field": "period_start",
+    "nullable": false
+  },
+  {
+    "table": "business_context",
+    "field": "period_end",
+    "nullable": false
+  },
+  {
+    "table": "business_context",
+    "field": "event_type",
+    "nullable": false
+  },
+  {
+    "table": "business_context",
+    "field": "explanation",
+    "nullable": false
+  },
+  {
+    "table": "business_context",
+    "field": "source_type",
+    "nullable": false
+  },
+  {
+    "table": "business_context",
+    "field": "source_name",
+    "nullable": false
+  },
+  {
+    "table": "business_context",
+    "field": "recorded_at",
+    "nullable": false
+  },
+  {
+    "table": "business_context",
+    "field": "confirmed",
+    "nullable": false
+  },
+  {
+    "table": "business_context",
+    "field": "causality_verified",
+    "nullable": false
+  },
+  {
+    "table": "business_context",
+    "field": "customer_id",
+    "nullable": true
+  },
+  {
+    "table": "businesses",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "businesses",
+    "field": "name",
+    "nullable": false
+  },
+  {
+    "table": "businesses",
+    "field": "industry",
+    "nullable": false
+  },
+  {
+    "table": "businesses",
+    "field": "timezone",
+    "nullable": false
+  },
+  {
+    "table": "businesses",
+    "field": "currency",
+    "nullable": false
+  },
+  {
+    "table": "businesses",
+    "field": "as_of",
+    "nullable": false
+  },
+  {
+    "table": "businesses",
+    "field": "synthetic",
+    "nullable": false
+  },
+  {
+    "table": "capabilities",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "capabilities",
+    "field": "module",
+    "nullable": false
+  },
+  {
+    "table": "capabilities",
+    "field": "entitled",
+    "nullable": false
+  },
+  {
+    "table": "capabilities",
+    "field": "data_health",
+    "nullable": false
+  },
+  {
+    "table": "customer_followups",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "customer_followups",
+    "field": "followup_id",
+    "nullable": false
+  },
+  {
+    "table": "customer_followups",
+    "field": "customer_id",
+    "nullable": false
+  },
+  {
+    "table": "customer_followups",
+    "field": "contacted_at",
+    "nullable": false
+  },
+  {
+    "table": "customer_followups",
+    "field": "channel",
+    "nullable": false
+  },
+  {
+    "table": "customer_followups",
+    "field": "summary",
+    "nullable": false
+  },
+  {
+    "table": "customer_followups",
+    "field": "outcome",
+    "nullable": false
+  },
+  {
+    "table": "customer_followups",
+    "field": "next_action",
+    "nullable": false
+  },
+  {
+    "table": "customer_followups",
+    "field": "next_action_date",
+    "nullable": true
+  },
+  {
+    "table": "customer_followups",
+    "field": "closed",
+    "nullable": false
+  },
+  {
+    "table": "customer_import_batch",
+    "field": "source_customer_id",
+    "nullable": false
+  },
+  {
+    "table": "customer_import_batch",
+    "field": "customer_name",
+    "nullable": false
+  },
+  {
+    "table": "customer_import_batch",
+    "field": "mobile",
+    "nullable": true
+  },
+  {
+    "table": "customer_import_batch",
+    "field": "email",
+    "nullable": true
+  },
+  {
+    "table": "customer_profile",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "customer_profile",
+    "field": "setting",
+    "nullable": false
+  },
+  {
+    "table": "customer_profile",
+    "field": "value",
+    "nullable": false
+  },
+  {
+    "table": "customer_profile",
+    "field": "status",
+    "nullable": false
+  },
+  {
+    "table": "customers",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "customers",
+    "field": "customer_id",
+    "nullable": false
+  },
+  {
+    "table": "customers",
+    "field": "source_customer_id",
+    "nullable": false
+  },
+  {
+    "table": "customers",
+    "field": "customer_name",
+    "nullable": false
+  },
+  {
+    "table": "customers",
+    "field": "mobile",
+    "nullable": true
+  },
+  {
+    "table": "customers",
+    "field": "email",
+    "nullable": false
+  },
+  {
+    "table": "customers",
+    "field": "contact_permission",
+    "nullable": false
+  },
+  {
+    "table": "customers",
+    "field": "owner_next_visit_date",
+    "nullable": true
+  },
+  {
+    "table": "customers",
+    "field": "owner_next_visit_value_ex_gst",
+    "nullable": true
+  },
+  {
+    "table": "customers",
+    "field": "default_return_days",
+    "nullable": true
+  },
+  {
+    "table": "customers",
+    "field": "first_completed_visit_date",
+    "nullable": true
+  },
+  {
+    "table": "enquiries",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "enquiries",
+    "field": "enquiry_id",
+    "nullable": false
+  },
+  {
+    "table": "enquiries",
+    "field": "customer_id",
+    "nullable": false
+  },
+  {
+    "table": "enquiries",
+    "field": "received_at",
+    "nullable": false
+  },
+  {
+    "table": "enquiries",
+    "field": "source",
+    "nullable": false
+  },
+  {
+    "table": "enquiries",
+    "field": "service_id",
+    "nullable": false
+  },
+  {
+    "table": "insights",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "insights",
+    "field": "insight_id",
+    "nullable": false
+  },
+  {
+    "table": "insights",
+    "field": "fingerprint",
+    "nullable": false
+  },
+  {
+    "table": "insights",
+    "field": "module",
+    "nullable": false
+  },
+  {
+    "table": "insights",
+    "field": "status",
+    "nullable": false
+  },
+  {
+    "table": "insights",
+    "field": "presented_at",
+    "nullable": false
+  },
+  {
+    "table": "insights",
+    "field": "snoozed_until",
+    "nullable": true
+  },
+  {
+    "table": "insights",
+    "field": "summary",
+    "nullable": false
+  },
+  {
+    "table": "insights",
+    "field": "estimated_impact_ex_gst",
+    "nullable": true
+  },
+  {
+    "table": "insights",
+    "field": "impact_is_estimate",
+    "nullable": false
+  },
+  {
+    "table": "inventory_batches",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "inventory_batches",
+    "field": "batch_id",
+    "nullable": false
+  },
+  {
+    "table": "inventory_batches",
+    "field": "receipt_item_id",
+    "nullable": false
+  },
+  {
+    "table": "inventory_batches",
+    "field": "item_id",
+    "nullable": false
+  },
+  {
+    "table": "inventory_batches",
+    "field": "supplier_id",
+    "nullable": false
+  },
+  {
+    "table": "inventory_batches",
+    "field": "received_at",
+    "nullable": false
+  },
+  {
+    "table": "inventory_batches",
+    "field": "received_quantity",
+    "nullable": false
+  },
+  {
+    "table": "inventory_batches",
+    "field": "landed_unit_cost",
+    "nullable": false
+  },
+  {
+    "table": "inventory_items",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "inventory_items",
+    "field": "item_id",
+    "nullable": false
+  },
+  {
+    "table": "inventory_items",
+    "field": "quantity_on_hand",
+    "nullable": false
+  },
+  {
+    "table": "inventory_items",
+    "field": "unit_cost",
+    "nullable": false
+  },
+  {
+    "table": "inventory_items",
+    "field": "supplier_lead_days",
+    "nullable": true
+  },
+  {
+    "table": "inventory_items",
+    "field": "quantity_on_order",
+    "nullable": false
+  },
+  {
+    "table": "inventory_items",
+    "field": "stock_as_of",
+    "nullable": false
+  },
+  {
+    "table": "inventory_items",
+    "field": "anomaly_suppressed",
+    "nullable": false
+  },
+  {
+    "table": "inventory_items",
+    "field": "movement_reliability",
+    "nullable": false
+  },
+  {
+    "table": "inventory_movements",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "inventory_movements",
+    "field": "movement_id",
+    "nullable": false
+  },
+  {
+    "table": "inventory_movements",
+    "field": "item_id",
+    "nullable": false
+  },
+  {
+    "table": "inventory_movements",
+    "field": "occurred_at",
+    "nullable": false
+  },
+  {
+    "table": "inventory_movements",
+    "field": "movement_type",
+    "nullable": false
+  },
+  {
+    "table": "inventory_movements",
+    "field": "quantity_delta",
+    "nullable": false
+  },
+  {
+    "table": "inventory_movements",
+    "field": "unit_cost",
+    "nullable": false
+  },
+  {
+    "table": "inventory_movements",
+    "field": "transaction_item_id",
+    "nullable": true
+  },
+  {
+    "table": "inventory_movements",
+    "field": "batch_id",
+    "nullable": true
+  },
+  {
+    "table": "inventory_movements",
+    "field": "reason",
+    "nullable": true
+  },
+  {
+    "table": "invoices",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "invoices",
+    "field": "invoice_id",
+    "nullable": false
+  },
+  {
+    "table": "invoices",
+    "field": "customer_id",
+    "nullable": false
+  },
+  {
+    "table": "invoices",
+    "field": "issued_on",
+    "nullable": false
+  },
+  {
+    "table": "invoices",
+    "field": "due_on",
+    "nullable": false
+  },
+  {
+    "table": "invoices",
+    "field": "invoice_amount",
+    "nullable": false
+  },
+  {
+    "table": "invoices",
+    "field": "currency",
+    "nullable": false
+  },
+  {
+    "table": "invoices",
+    "field": "amount_basis",
+    "nullable": false
+  },
+  {
+    "table": "invoices",
+    "field": "credit_amount",
+    "nullable": false
+  },
+  {
+    "table": "items",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "items",
+    "field": "item_id",
+    "nullable": false
+  },
+  {
+    "table": "items",
+    "field": "sku",
+    "nullable": false
+  },
+  {
+    "table": "items",
+    "field": "item_name",
+    "nullable": false
+  },
+  {
+    "table": "items",
+    "field": "item_type",
+    "nullable": false
+  },
+  {
+    "table": "items",
+    "field": "default_duration_minutes",
+    "nullable": false
+  },
+  {
+    "table": "items",
+    "field": "list_price_ex_gst",
+    "nullable": false
+  },
+  {
+    "table": "items",
+    "field": "unit_cost",
+    "nullable": false
+  },
+  {
+    "table": "items",
+    "field": "active",
+    "nullable": false
+  },
+  {
+    "table": "mapping_rules",
+    "field": "mapping_id",
+    "nullable": false
+  },
+  {
+    "table": "mapping_rules",
+    "field": "entity",
+    "nullable": false
+  },
+  {
+    "table": "mapping_rules",
+    "field": "raw_value",
+    "nullable": false
+  },
+  {
+    "table": "mapping_rules",
+    "field": "canonical_id",
+    "nullable": false
+  },
+  {
+    "table": "mapping_rules",
+    "field": "status",
+    "nullable": false
+  },
+  {
+    "table": "mapping_rules",
+    "field": "approved_at",
+    "nullable": false
+  },
+  {
+    "table": "nonbookable_blocks",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "nonbookable_blocks",
+    "field": "block_id",
+    "nullable": false
+  },
+  {
+    "table": "nonbookable_blocks",
+    "field": "staff_id",
+    "nullable": false
+  },
+  {
+    "table": "nonbookable_blocks",
+    "field": "start_at",
+    "nullable": false
+  },
+  {
+    "table": "nonbookable_blocks",
+    "field": "end_at",
+    "nullable": false
+  },
+  {
+    "table": "nonbookable_blocks",
+    "field": "reason",
+    "nullable": false
+  },
+  {
+    "table": "nonbookable_blocks",
+    "field": "approved_by",
+    "nullable": false
+  },
+  {
+    "table": "nonbookable_blocks",
+    "field": "recorded_at",
+    "nullable": false
+  },
+  {
+    "table": "payments",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "payments",
+    "field": "payment_id",
+    "nullable": false
+  },
+  {
+    "table": "payments",
+    "field": "invoice_id",
+    "nullable": false
+  },
+  {
+    "table": "payments",
+    "field": "paid_on",
+    "nullable": false
+  },
+  {
+    "table": "payments",
+    "field": "amount",
+    "nullable": false
+  },
+  {
+    "table": "price_history",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "price_history",
+    "field": "price_event_id",
+    "nullable": false
+  },
+  {
+    "table": "price_history",
+    "field": "service_id",
+    "nullable": false
+  },
+  {
+    "table": "price_history",
+    "field": "effective_on",
+    "nullable": false
+  },
+  {
+    "table": "price_history",
+    "field": "old_price",
+    "nullable": false
+  },
+  {
+    "table": "price_history",
+    "field": "new_price",
+    "nullable": false
+  },
+  {
+    "table": "price_history",
+    "field": "event_type",
+    "nullable": false
+  },
+  {
+    "table": "price_history",
+    "field": "action_id",
+    "nullable": false
+  },
+  {
+    "table": "pricing_scenarios",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "pricing_scenarios",
+    "field": "scenario_id",
+    "nullable": false
+  },
+  {
+    "table": "pricing_scenarios",
+    "field": "service_id",
+    "nullable": false
+  },
+  {
+    "table": "pricing_scenarios",
+    "field": "baseline_price",
+    "nullable": false
+  },
+  {
+    "table": "pricing_scenarios",
+    "field": "baseline_volume",
+    "nullable": false
+  },
+  {
+    "table": "pricing_scenarios",
+    "field": "proposed_price",
+    "nullable": false
+  },
+  {
+    "table": "pricing_scenarios",
+    "field": "unit_cost",
+    "nullable": false
+  },
+  {
+    "table": "pricing_scenarios",
+    "field": "spare_bookable_hours",
+    "nullable": false
+  },
+  {
+    "table": "pricing_scenarios",
+    "field": "hours_per_service",
+    "nullable": false
+  },
+  {
+    "table": "pricing_scenarios",
+    "field": "description",
+    "nullable": false
+  },
+  {
+    "table": "purchase_orders",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "purchase_orders",
+    "field": "order_id",
+    "nullable": false
+  },
+  {
+    "table": "purchase_orders",
+    "field": "supplier_id",
+    "nullable": false
+  },
+  {
+    "table": "purchase_orders",
+    "field": "ordered_at",
+    "nullable": false
+  },
+  {
+    "table": "purchase_orders",
+    "field": "expected_at",
+    "nullable": false
+  },
+  {
+    "table": "purchase_orders",
+    "field": "status",
+    "nullable": false
+  },
+  {
+    "table": "purchase_receipt_items",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "purchase_receipt_items",
+    "field": "receipt_item_id",
+    "nullable": false
+  },
+  {
+    "table": "purchase_receipt_items",
+    "field": "receipt_id",
+    "nullable": false
+  },
+  {
+    "table": "purchase_receipt_items",
+    "field": "item_id",
+    "nullable": false
+  },
+  {
+    "table": "purchase_receipt_items",
+    "field": "quantity",
+    "nullable": false
+  },
+  {
+    "table": "purchase_receipt_items",
+    "field": "purchase_unit_cost",
+    "nullable": false
+  },
+  {
+    "table": "purchase_receipt_items",
+    "field": "direct_freight_ex_gst",
+    "nullable": false
+  },
+  {
+    "table": "purchase_receipt_items",
+    "field": "direct_duty_ex_gst",
+    "nullable": false
+  },
+  {
+    "table": "purchase_receipt_items",
+    "field": "direct_other_ex_gst",
+    "nullable": false
+  },
+  {
+    "table": "purchase_receipt_items",
+    "field": "unit_of_measure",
+    "nullable": false
+  },
+  {
+    "table": "purchase_receipts",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "purchase_receipts",
+    "field": "receipt_id",
+    "nullable": false
+  },
+  {
+    "table": "purchase_receipts",
+    "field": "order_id",
+    "nullable": false
+  },
+  {
+    "table": "purchase_receipts",
+    "field": "supplier_id",
+    "nullable": false
+  },
+  {
+    "table": "purchase_receipts",
+    "field": "received_at",
+    "nullable": false
+  },
+  {
+    "table": "purchase_receipts",
+    "field": "freight_ex_gst",
+    "nullable": false
+  },
+  {
+    "table": "purchase_receipts",
+    "field": "duty_ex_gst",
+    "nullable": false
+  },
+  {
+    "table": "purchase_receipts",
+    "field": "other_charges_ex_gst",
+    "nullable": false
+  },
+  {
+    "table": "purchase_receipts",
+    "field": "currency",
+    "nullable": false
+  },
+  {
+    "table": "quote_followups",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "quote_followups",
+    "field": "quote_followup_id",
+    "nullable": false
+  },
+  {
+    "table": "quote_followups",
+    "field": "quote_id",
+    "nullable": false
+  },
+  {
+    "table": "quote_followups",
+    "field": "contacted_at",
+    "nullable": false
+  },
+  {
+    "table": "quote_followups",
+    "field": "channel",
+    "nullable": false
+  },
+  {
+    "table": "quote_followups",
+    "field": "summary",
+    "nullable": false
+  },
+  {
+    "table": "quote_followups",
+    "field": "outcome",
+    "nullable": false
+  },
+  {
+    "table": "quote_followups",
+    "field": "next_action_date",
+    "nullable": true
+  },
+  {
+    "table": "quote_followups",
+    "field": "attempt",
+    "nullable": false
+  },
+  {
+    "table": "quote_followups",
+    "field": "staff_id",
+    "nullable": false
+  },
+  {
+    "table": "quote_versions",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "quote_versions",
+    "field": "quote_version_id",
+    "nullable": false
+  },
+  {
+    "table": "quote_versions",
+    "field": "quote_id",
+    "nullable": false
+  },
+  {
+    "table": "quote_versions",
+    "field": "version",
+    "nullable": false
+  },
+  {
+    "table": "quote_versions",
+    "field": "created_at",
+    "nullable": false
+  },
+  {
+    "table": "quote_versions",
+    "field": "amount_ex_gst",
+    "nullable": false
+  },
+  {
+    "table": "quotes",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "quotes",
+    "field": "quote_id",
+    "nullable": false
+  },
+  {
+    "table": "quotes",
+    "field": "enquiry_id",
+    "nullable": false
+  },
+  {
+    "table": "quotes",
+    "field": "customer_id",
+    "nullable": false
+  },
+  {
+    "table": "quotes",
+    "field": "staff_id",
+    "nullable": false
+  },
+  {
+    "table": "quotes",
+    "field": "service_id",
+    "nullable": false
+  },
+  {
+    "table": "quotes",
+    "field": "issued_at",
+    "nullable": false
+  },
+  {
+    "table": "quotes",
+    "field": "status",
+    "nullable": false
+  },
+  {
+    "table": "quotes",
+    "field": "value_ex_gst",
+    "nullable": false
+  },
+  {
+    "table": "quotes",
+    "field": "direct_cost",
+    "nullable": false
+  },
+  {
+    "table": "quotes",
+    "field": "expires_on",
+    "nullable": false
+  },
+  {
+    "table": "quotes",
+    "field": "source_followup_date",
+    "nullable": true
+  },
+  {
+    "table": "quotes",
+    "field": "owner_followup_date",
+    "nullable": true
+  },
+  {
+    "table": "quotes",
+    "field": "snoozed_until",
+    "nullable": true
+  },
+  {
+    "table": "quotes",
+    "field": "no_more_followup",
+    "nullable": false
+  },
+  {
+    "table": "quotes",
+    "field": "lost_reason",
+    "nullable": true
+  },
+  {
+    "table": "quotes",
+    "field": "linked_transaction_id",
+    "nullable": true
+  },
+  {
+    "table": "quotes",
+    "field": "closed_at",
+    "nullable": true
+  },
+  {
+    "table": "review_checkpoints",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "review_checkpoints",
+    "field": "checkpoint_id",
+    "nullable": false
+  },
+  {
+    "table": "review_checkpoints",
+    "field": "action_id",
+    "nullable": false
+  },
+  {
+    "table": "review_checkpoints",
+    "field": "reviewed_on",
+    "nullable": true
+  },
+  {
+    "table": "review_checkpoints",
+    "field": "snapshot_json",
+    "nullable": false
+  },
+  {
+    "table": "review_checkpoints",
+    "field": "conclusion",
+    "nullable": true
+  },
+  {
+    "table": "review_checkpoints",
+    "field": "owner_decision",
+    "nullable": false
+  },
+  {
+    "table": "review_checkpoints",
+    "field": "next_review_date",
+    "nullable": false
+  },
+  {
+    "table": "service_components",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "service_components",
+    "field": "component_id",
+    "nullable": false
+  },
+  {
+    "table": "service_components",
+    "field": "service_id",
+    "nullable": false
+  },
+  {
+    "table": "service_components",
+    "field": "component_name",
+    "nullable": false
+  },
+  {
+    "table": "service_components",
+    "field": "component_price_ex_gst",
+    "nullable": true
+  },
+  {
+    "table": "services",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "services",
+    "field": "service_id",
+    "nullable": false
+  },
+  {
+    "table": "services",
+    "field": "service_name",
+    "nullable": false
+  },
+  {
+    "table": "services",
+    "field": "service_family",
+    "nullable": false
+  },
+  {
+    "table": "services",
+    "field": "default_duration_minutes",
+    "nullable": false
+  },
+  {
+    "table": "services",
+    "field": "list_price_ex_gst",
+    "nullable": false
+  },
+  {
+    "table": "services",
+    "field": "direct_cost",
+    "nullable": false
+  },
+  {
+    "table": "services",
+    "field": "default_return_days",
+    "nullable": true
+  },
+  {
+    "table": "slot_recovery",
+    "field": "cancelled_booking_id",
+    "nullable": false
+  },
+  {
+    "table": "slot_recovery",
+    "field": "replacement_booking_id",
+    "nullable": false
+  },
+  {
+    "table": "slot_recovery",
+    "field": "recovered_minutes",
+    "nullable": false
+  },
+  {
+    "table": "slot_recovery",
+    "field": "match_basis",
+    "nullable": false
+  },
+  {
+    "table": "staff",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "staff",
+    "field": "staff_id",
+    "nullable": false
+  },
+  {
+    "table": "staff",
+    "field": "staff_name",
+    "nullable": false
+  },
+  {
+    "table": "staff",
+    "field": "role",
+    "nullable": false
+  },
+  {
+    "table": "staff_availability",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "staff_availability",
+    "field": "availability_id",
+    "nullable": false
+  },
+  {
+    "table": "staff_availability",
+    "field": "staff_id",
+    "nullable": false
+  },
+  {
+    "table": "staff_availability",
+    "field": "work_date",
+    "nullable": false
+  },
+  {
+    "table": "staff_availability",
+    "field": "shift_start",
+    "nullable": false
+  },
+  {
+    "table": "staff_availability",
+    "field": "shift_end",
+    "nullable": false
+  },
+  {
+    "table": "staff_availability",
+    "field": "rostered_minutes",
+    "nullable": false
+  },
+  {
+    "table": "staff_availability",
+    "field": "nonbookable_minutes",
+    "nullable": false
+  },
+  {
+    "table": "staff_availability",
+    "field": "bookable_minutes",
+    "nullable": false
+  },
+  {
+    "table": "staff_skills",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "staff_skills",
+    "field": "skill_id",
+    "nullable": false
+  },
+  {
+    "table": "staff_skills",
+    "field": "staff_id",
+    "nullable": false
+  },
+  {
+    "table": "staff_skills",
+    "field": "service_id",
+    "nullable": false
+  },
+  {
+    "table": "staff_skills",
+    "field": "qualified",
+    "nullable": false
+  },
+  {
+    "table": "supplier_credits",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "supplier_credits",
+    "field": "supplier_credit_id",
+    "nullable": false
+  },
+  {
+    "table": "supplier_credits",
+    "field": "supplier_id",
+    "nullable": false
+  },
+  {
+    "table": "supplier_credits",
+    "field": "item_id",
+    "nullable": false
+  },
+  {
+    "table": "supplier_credits",
+    "field": "credited_on",
+    "nullable": false
+  },
+  {
+    "table": "supplier_credits",
+    "field": "quantity",
+    "nullable": false
+  },
+  {
+    "table": "supplier_credits",
+    "field": "amount_ex_gst",
+    "nullable": false
+  },
+  {
+    "table": "supplier_credits",
+    "field": "reason",
+    "nullable": false
+  },
+  {
+    "table": "suppliers",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "suppliers",
+    "field": "supplier_id",
+    "nullable": false
+  },
+  {
+    "table": "suppliers",
+    "field": "supplier_name",
+    "nullable": false
+  },
+  {
+    "table": "suppliers",
+    "field": "normal_lead_days",
+    "nullable": false
+  },
+  {
+    "table": "suppliers",
+    "field": "payment_terms_days",
+    "nullable": false
+  },
+  {
+    "table": "suppliers",
+    "field": "minimum_order_quantity",
+    "nullable": false
+  },
+  {
+    "table": "suppliers",
+    "field": "currency",
+    "nullable": false
+  },
+  {
+    "table": "suppliers",
+    "field": "unit_of_measure",
+    "nullable": false
+  },
+  {
+    "table": "transaction_items",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "transaction_items",
+    "field": "transaction_item_id",
+    "nullable": false
+  },
+  {
+    "table": "transaction_items",
+    "field": "transaction_id",
+    "nullable": false
+  },
+  {
+    "table": "transaction_items",
+    "field": "item_id",
+    "nullable": false
+  },
+  {
+    "table": "transaction_items",
+    "field": "staff_id",
+    "nullable": false
+  },
+  {
+    "table": "transaction_items",
+    "field": "quantity",
+    "nullable": false
+  },
+  {
+    "table": "transaction_items",
+    "field": "gross_amount_ex_gst",
+    "nullable": false
+  },
+  {
+    "table": "transaction_items",
+    "field": "discount_ex_gst",
+    "nullable": false
+  },
+  {
+    "table": "transaction_items",
+    "field": "refund_ex_gst",
+    "nullable": false
+  },
+  {
+    "table": "transaction_items",
+    "field": "net_amount_ex_gst",
+    "nullable": false
+  },
+  {
+    "table": "transaction_items",
+    "field": "direct_cost",
+    "nullable": true
+  },
+  {
+    "table": "transaction_items",
+    "field": "original_transaction_item_id",
+    "nullable": true
+  },
+  {
+    "table": "transaction_items",
+    "field": "batch_id",
+    "nullable": true
+  },
+  {
+    "table": "transactions",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "transactions",
+    "field": "transaction_id",
+    "nullable": false
+  },
+  {
+    "table": "transactions",
+    "field": "booking_id",
+    "nullable": true
+  },
+  {
+    "table": "transactions",
+    "field": "customer_id",
+    "nullable": false
+  },
+  {
+    "table": "transactions",
+    "field": "posted_at",
+    "nullable": false
+  },
+  {
+    "table": "transactions",
+    "field": "status",
+    "nullable": false
+  },
+  {
+    "table": "transactions",
+    "field": "transaction_type",
+    "nullable": false
+  },
+  {
+    "table": "vehicles",
+    "field": "business_id",
+    "nullable": false
+  },
+  {
+    "table": "vehicles",
+    "field": "vehicle_id",
+    "nullable": false
+  },
+  {
+    "table": "vehicles",
+    "field": "customer_id",
+    "nullable": false
+  },
+  {
+    "table": "vehicles",
+    "field": "rego",
+    "nullable": false
+  },
+  {
+    "table": "vehicles",
+    "field": "make",
+    "nullable": false
+  },
+  {
+    "table": "vehicles",
+    "field": "model",
+    "nullable": false
+  },
+  {
+    "table": "vehicles",
+    "field": "next_service_date",
+    "nullable": false
+  },
+  {
+    "table": "vehicles",
+    "field": "next_service_mileage",
+    "nullable": false
+  },
+  {
+    "table": "vehicles",
+    "field": "recorded_odometer",
+    "nullable": false
+  },
+  {
+    "table": "vehicles",
+    "field": "industry_example",
+    "nullable": false
+  }
+]
