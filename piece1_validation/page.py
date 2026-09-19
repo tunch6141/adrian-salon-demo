@@ -20,13 +20,15 @@ def render():
     entered=st.text_input('Demo password',type='password',key='piece1_password')
     if not hmac.compare_digest(entered.encode(),password.encode()):
         st.caption('Enter your existing demo password to continue.');return
-    st.write('Check raw-data cleaning and revenue calculations before connecting them to the analyst.')
+    st.write('Review the cleaned data and revenue calculations shared with the analyst.')
     from analytics.runtime import load_snapshot, SOURCE
-    try:intake=load_snapshot(st.session_state)
+    try:
+        with st.spinner('Loading and validating salon data…'):
+            intake=load_snapshot(st.session_state)
+            baseline=load_snapshot()
     except Exception as exc:
         st.error(f'Validation data could not load: {type(exc).__name__}: {exc}')
         st.info('Check that the entire piece1_validation folder was uploaded beside app.py.');return
-    baseline=load_snapshot()
     st.caption(f'Reporting clock: {intake.asof.isoformat()} · {intake.zone.key}')
     person=st.selectbox('Revenue scope',['Sarah','Matthew','Sam','Whole business'])
     staff={'Sarah':'S01','Matthew':'S02','Sam':'S03','Whole business':None}[person]

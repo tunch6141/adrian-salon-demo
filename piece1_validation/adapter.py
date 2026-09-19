@@ -127,11 +127,15 @@ class Intake:
         self.issues.append(dict(table=table,source_row=row,field=field,code=code,message=message,raw_value=raw_value,record_id=record_id))
     def validate_relations(self):
         staff={r['staff_id'] for r in self.tables.get('staff',[])}
+        # Keep the first source record, matching the previous lookup semantics.
+        lineage_by_record={}
+        for entry in self.lineage:
+            lineage_by_record.setdefault((entry['table'],entry['record_id']),entry)
         aliases={r['raw_value'].casefold():r['canonical_id'] for r in self.tables.get('mapping_rules',[]) if r['entity']=='staff' and r['status']=='approved'}
         for table,rows in self.tables.items():
             if table in ['staff','mapping_rules','audit_log']:continue
             for r in rows:
-                key=r.get(KEYS[table]);lin=next((x for x in self.lineage if x['table']==table and x['record_id']==key),{})
+                key=r.get(KEYS[table]);lin=lineage_by_record.get((table,key),{})
                 for field in ['staff_id','staff_id_after']:
                     if field not in r or not r[field] or r[field] in staff:continue
                     old=r[field];target=aliases.get(old.casefold())

@@ -11,7 +11,8 @@ def render(setting):
     if not password:st.info('Set DEMO_PASSWORD in Streamlit Secrets.');return
     entered=st.text_input('Demo password',type='password',key='evidence_password')
     if not hmac.compare_digest(entered.encode(),password.encode()):return
-    intake=load_snapshot(st.session_state)
+    with st.spinner('Loading salon data…'):
+        intake=load_snapshot(st.session_state)
     st.subheader('Business evidence')
     st.caption(f'Synthetic data · As at {intake.asof:%d %B %Y %H:%M %Z} · Revenue excludes GST. Receivables show their source tax basis.')
     start=st.date_input('From',value=date(2026,9,7),key='evidence_start')
@@ -19,7 +20,8 @@ def render(setting):
     if start>end:st.error('Choose an end date on or after the start.');return
     st.dataframe(staff_summary(intake,str(start),str(end+timedelta(days=1))),hide_index=True)
     st.caption('The dates above filter the staff summary. Each evidence table below retains its own stated period. A note never silently changes revenue or availability.')
-    frames=build_views(intake)
+    with st.spinner('Preparing business evidence…'):
+        frames=build_views(intake)
     choice=st.selectbox('Inspect evidence',list(frames),key='evidence_table')
     st.dataframe(frames[choice],hide_index=True)
     st.download_button('Download this evidence',frames[choice].to_csv(index=False).encode(),'evidence_'+choice+'.csv','text/csv')

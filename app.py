@@ -135,7 +135,9 @@ def main():
     if view == 'Ask your salon':
         from analyst_ui import render
         from analytics.runtime import load_snapshot
-        render(load_snapshot(st.session_state), setting)
+        with st.spinner('Loading salon data…'):
+            salon_snapshot=load_snapshot(st.session_state)
+        render(salon_snapshot, setting)
         return
     if view == 'Business evidence':
         from analytics.dashboard import render
