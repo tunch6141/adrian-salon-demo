@@ -234,3 +234,13 @@ def main():
 
 if __name__ == '__main__':
     main()
+import streamlit as st
+from supabase import create_client
+
+@st.cache_resource
+def init_supabase():
+    url = st.secrets["https://cpdbgbypogiewgobhrup.supabase.co"]
+    key = st.secrets["sb_publishable_X90Lmvc1hH2PSqQRu_oXag_3K87HPQr"]
+    return create_client(url, key)
+
+supabase = init_supabase()
