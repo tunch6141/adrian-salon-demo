@@ -25,6 +25,34 @@ Context is owner-reported, not verified causality. Never claim a reported cause 
 class QueryBlocked(ValueError):
     pass
 
+
+def query_period(results):
+    """Recover one unambiguous inclusive calendar range from executed SQL filters."""
+    from datetime import date,timedelta
+    import re
+    periods=set()
+    def day(node):
+        if not isinstance(node,exp.Literal) or not node.is_string:return None
+        try:return date.fromisoformat(node.this)
+        except ValueError:return None
+    def dated(node):
+        return isinstance(node,exp.Column) and bool(re.search(r'(_date|_at|_start|_end)$|^date$',node.name))
+    for result in results:
+        try:tree=sqlglot.parse_one(result.get('sql',''),read='sqlite')
+        except Exception:continue
+        bounds={}
+        for node in tree.find_all(exp.Between):
+            a,b=day(node.args.get('low')),day(node.args.get('high'))
+            if dated(node.this) and a and b and a<=b:periods.add((str(a),str(b)))
+        for kind,side,adjust in [(exp.GTE,'start',0),(exp.GT,'start',1),(exp.LTE,'end',0),(exp.LT,'end',-1)]:
+            for node in tree.find_all(kind):
+                value=day(node.expression)
+                if dated(node.this) and value:bounds.setdefault(node.this.name,{})[side]=value+timedelta(days=adjust)
+        for bound in bounds.values():
+            if 'start' in bound and 'end' in bound and bound['start']<=bound['end']:
+                periods.add((str(bound['start']),str(bound['end'])))
+    return next(iter(periods)) if len(periods)==1 else None
+
 class Database:
     def __init__(self, tables):
         a = tables['appointments'].copy()

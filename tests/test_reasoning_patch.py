@@ -193,3 +193,16 @@ def test_unqueried_costs_are_not_missing_and_utilisation_has_no_invented_target(
     validate_commercial_labels(db,p,a,[])
     a.investigation='Sarah made reasonably efficient use of her capacity.'
     with pytest.raises(QueryBlocked):validate_commercial_labels(db,p,a,[])
+
+def test_sql_fallback_binds_actual_query_period_even_if_planner_omits_note_dates(db):
+    from analyst_engine import query_period
+    sql="SELECT booking_source,COUNT(*) AS completed_booking_count FROM booking_records WHERE status='Completed' AND appointment_date BETWEEN '2026-08-01' AND '2026-08-31' GROUP BY booking_source ORDER BY completed_booking_count DESC"
+    p=Plan(intent='lookup',scope='August completed booking sources',missing_information='',queries=[sql],context_entity='',context_start='',context_end='',draft=None)
+    a=Answer(claims=[dict(text='In August [[start_year]], phone contributed [[0]] completed bookings.',evidence=[dict(result=0,row=0,column='completed_booking_count')],context_ids=[])],
+        investigation='',recommendation='',measurement='',missing_information='',chart=dict(kind='none',result=0,x='',y=''))
+    with patch('analyst_ai.structured',side_effect=[p,a,Review(approved=True,issues=[])]):
+        result=investigate(None,'gpt-4.1-mini',db,'Completed bookings by source in August?',[],ContextStore())
+    assert result['status']=='answered'
+    assert result['answer']['claims'][0]['text']=='In August 2026, phone contributed 98 completed bookings.'
+    assert query_period([dict(sql="SELECT * FROM booking_records WHERE appointment_date >= '2026-08-01' AND appointment_date < '2026-09-01'")])==('2026-08-01','2026-08-31')
+    assert query_period([dict(sql=sql),dict(sql=sql.replace('2026-08','2026-07'))]) is None

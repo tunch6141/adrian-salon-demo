@@ -376,6 +376,12 @@ def _investigate(client,model,db,question,history,context_store,stage):
     if failed:
         if not results or not (plan.diagnostic or plan.revenue or plan.trend or plan.booking_id):return failed
         execution_notes.extend(failed['issues'])
+    if plan.queries and not (plan.diagnostic or plan.revenue or plan.trend):
+        from analyst_engine import query_period
+        period=query_period(results)
+        if period:
+            plan.context_start,plan.context_end=period
+            contexts=context_store.search(plan.context_entity,*period)
     if not results and not contexts:
         plan.missing_information='No matching records or confirmed business notes were found for this scope. Please check the identifier or period.'
         return {'plan':plan.model_dump(),'answer':None,'results':[],'contexts':[], 'status':'clarify',
