@@ -110,6 +110,13 @@ class Database:
         for projection in tree.expressions:
             if not list(projection.find_all(exp.Column)) and not projection.find(exp.Count):
                 raise QueryBlocked('Each result must derive from database columns.')
+        if hasattr(self,'intake') and tables[0].name=='financial_lines':
+            for comparison in tree.find_all(exp.EQ):
+                left,right=comparison.this,comparison.expression
+                if isinstance(right,exp.Column):left,right=right,left
+                if isinstance(left,exp.Column) and left.name=='item_type' and isinstance(right,exp.Literal) and right.is_string:
+                    if right.this not in {'service','product','part'}:
+                        raise QueryBlocked("item_type must be service, product or part. Retail is stored as product; unknown categories cannot be reported as zero.")
         deadline=time.monotonic()+2
         self.con.set_progress_handler(lambda: int(time.monotonic()>deadline),1000)
         # Prevent SQL SUM/AVG from quietly treating incomplete costs as a full margin.
@@ -225,6 +232,23 @@ def bind_claim_values(results,claim,periods):
     import re
     refs=claim['evidence']
     text=claim['text']
+    # Canonicalise only dates exactly equal to the trusted calculation scope.
+    # Monetary values still require evidence slots, even when their digits resemble a date.
+    from datetime import date
+    dates=[]
+    for key,value in zip(('start','end'),periods):
+        try: day=date.fromisoformat(value)
+        except (ValueError,TypeError):continue
+        dates.append(day)
+        for token in (day.isoformat(),f'{day.day} {day:%B %Y}',f'{day.day} {day:%b %Y}'):
+            text=re.sub(r'(?<![\w.])'+re.escape(token)+r'(?!\w)','[['+key+']]',text)
+    if len(dates)==2 and (dates[0].year,dates[0].month)==(dates[1].year,dates[1].month):
+        a,b=dates
+        for month in (a.strftime('%B'),a.strftime('%b')):
+            pattern=rf'(?<![\w.]){a.day}\s*(?:to|–|-)\s*{b.day} {month} {a.year}(?!\w)'
+            text=re.sub(pattern,'[[start]] to [[end]]',text)
+        # The end date may already have been canonicalised above.
+        text=re.sub(rf'(?<![\w.]){a.day}\s*(?:to|–|-)\s*\[\[end\]\]','[[start]] to [[end]]',text)
     without_slots=re.sub(r'\[\[(?:\d+|start|end)\]\]','',text)
     if re.search(r'\d',without_slots):
         raise QueryBlocked('Use evidence placeholders for numbers, including years; do not type numerical facts.')

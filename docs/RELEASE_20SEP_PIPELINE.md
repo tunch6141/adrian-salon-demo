@@ -40,3 +40,10 @@ Run `python -m pytest -q`. Tests cover existing analytical behaviour plus raw pr
 A rollback-only acceptance transaction was also run on the live Supabase project as `service_role`. It passed raw storage and readback, cleaned version publication, approval persistence, idempotent retry, stale-confirmation rejection, immutable raw history, rejection of erased approvals, rule reuse on a second raw batch and audit event linkage. Temporary test records were rolled back.
 
 Supabase security advisors reported only informational notices that RLS tables have no client policies. This is intentional for server-role-only access in this pilot; anonymous and authenticated client roles have no table access. See the [Supabase RLS advisor description](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
+
+
+## Live integration findings
+
+The deployed app successfully stored the expanded raw dataset and read back its saved cleaned version: 42 source tables, 2,506 cleaned bookings, and three deliberate unresolved issues. Direct SQL against that version independently verified Sarah's service revenue of AUD 1,380 and product/retail revenue of AUD 30 for 7–13 September 2026.
+
+The first live GPT-4.1 mini question exposed an existing category-selection error: it queried `item_type='retail'` instead of the canonical `product` value. The follow-up patch provides an explicit deterministic revenue module for total/category lookups, rejects unsupported item categories in dynamic queries, and canonicalises dates only when they exactly match the trusted calculation period. Financial figures still require evidence placeholders. This is a fix to the existing revenue module, not a new metric family.

@@ -21,6 +21,11 @@ class Diagnostic(BaseModel):
     comparison_end_date: str = ""
     comparison_divisor: int = 1
 
+class RevenueRequest(BaseModel):
+    staff: list[str] = Field(description="Staff names, or an empty list for the whole business")
+    start_date: str
+    end_date: str
+
 class Plan(BaseModel):
     intent: Literal['lookup','analysis','followup','action','context','unsupported','clarify']
     scope: str
@@ -31,6 +36,7 @@ class Plan(BaseModel):
     context_end: str
     draft: ContextDraft | None
     diagnostic: Diagnostic | None = None
+    revenue: RevenueRequest | None = None
 
 class Citation(BaseModel):
     result: int
@@ -67,7 +73,8 @@ class Review(BaseModel):
 class QueryRepair(BaseModel):
     query: str
 
-PLANNER='''Plan a concise commercial investigation. For revenue explain volume and value/mix, not just totals. For a quiet future week retrieve booking hours AND matching capacity, and historical bookings at equal lead time when comparing. For trends group by date/week/month and staff for charts. For new topics freely compose supported SQL against the schema, not just the diagnostic. Use SUM(CASE WHEN ... THEN ... ELSE ... END) for conditional comparisons, calculated changes and shares; the database must calculate them, not the narrator. Only include queries necessary for the owner's question.
+PLANNER='''For a simple revenue total or service/retail breakdown in the canonical salon dataset, set revenue={staff:[names],start_date:inclusive ISO date,end_date:inclusive ISO date}, queries=[], diagnostic=null. This invokes the approved revenue calculation with refunds included and returns service, retail, part and total net revenue. Use staff=[] for the whole business. Use this module only when financial_lines is in the supplied schema; otherwise revenue=null. Other questions use revenue=null and the relevant diagnostic or SQL.
+Plan a concise commercial investigation. For revenue explain volume and value/mix, not just totals. For a quiet future week retrieve booking hours AND matching capacity, and historical bookings at equal lead time when comparing. For trends group by date/week/month and staff for charts. For new topics freely compose supported SQL against the schema, not just the diagnostic. Use SUM(CASE WHEN ... THEN ... ELSE ... END) for conditional comparisons, calculated changes and shares; the database must calculate them, not the narrator. Only include queries necessary for the owner's question.
 For period comparisons, diagnostic.start_date/end_date are ONLY the current period. Put the earlier period in comparison_start_date/comparison_end_date; never combine July and August into one diagnostic total. comparison_divisor=1 for month vs month, 4 for this week versus the prior four-week weekly average. Empty comparison dates mean no period comparison. These fields produce calculated totals, differences and percentage changes.
 REVENUE INVESTIGATION RULE: 'Why is that?' after a staff/revenue/hours comparison is answerable as a financial breakdown. It is NOT automatically unsupported just because there is no recorded root cause. Investigate volume, revenue per completed service hour, service mix and prices. Distinguish these measured contributors from unknown motivations or behaviour. Resolve staff names against the supplied business scope. Preserve periods from earlier successful turns. Never accept a user/previous answer's claim of a decline without recalculating.
 For staff performance questions (including 'How did Sarah perform?'), staff service-sales comparisons or why follow-ups, fill diagnostic with the staff involved and exact dates. This invokes approved Python totals, service-category breakdowns and exact differences. Prefer this diagnostic for staff performance rather than joining views. Only add queries for evidence the diagnostic does not supply. Do not use it for unrelated questions. For other questions diagnostic=null.
@@ -179,6 +186,10 @@ def _investigate(client,model,db,question,history,context_store,stage):
                     'status':'facts_only' if results else 'blocked',
                     'issues':['The analyst could not produce a permitted query for this request: '+reason]}
         return None
+    if plan.revenue:
+        from analytics.diagnostics import revenue_diagnostic
+        r=plan.revenue
+        results.extend(revenue_diagnostic(db,r.staff,r.start_date,r.end_date))
     if plan.diagnostic:
         d=plan.diagnostic
         if d.comparison_start_date and d.comparison_end_date:

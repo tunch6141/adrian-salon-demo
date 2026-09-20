@@ -174,3 +174,38 @@ def test_analyst_receives_changed_cleaned_financial_evidence():
         assert '1,510.00' in result['answer']['claims'][0]['text']
         assert raw==raw_payload(SOURCE)
     finally:db.close()
+
+def test_revenue_module_matches_known_service_retail_total_and_refunds():
+    from analytics.diagnostics import revenue_diagnostic
+    from analyst_ai import RevenueRequest,Plan,Answer,Review,investigate
+    from business_context import ContextStore
+    intake=restore_snapshot(record(raw_payload(SOURCE),checkpoint({})))
+    db=Database.from_intake(intake)
+    try:
+        rows=revenue_diagnostic(db,['Sarah'],'2026-09-07','2026-09-13')[0]['rows']
+        assert rows[0]['service_revenue_aud']==1380
+        assert rows[0]['retail_revenue_aud']==30
+        assert rows[0]['total_net_revenue_aud']==1410
+        plan=Plan(intent='lookup',scope='Sarah revenue',missing_information='',queries=[],
+            revenue=RevenueRequest(staff=['Sarah'],start_date='2026-09-07',end_date='2026-09-13'),
+            context_entity='Sarah',context_start='2026-09-07',context_end='2026-09-13',draft=None)
+        answer=Answer(claims=[dict(text='Sarah recorded [[0]] net revenue from 7 to 13 September 2026.',
+            evidence=[dict(result=0,row=0,column='total_net_revenue_aud',format='money')],context_ids=[])],
+            investigation='',recommendation='',measurement='',missing_information='',chart=dict(kind='none',result=0,x='',y=''))
+        with patch('analyst_ai.structured',side_effect=[plan,answer,Review(approved=True,issues=[])]):
+            result=investigate(object(),'gpt-4.1-mini',db,'Sarah revenue?',[],ContextStore())
+        assert result['status']=='answered'
+        assert 'AUD 1,410.00' in result['answer']['claims'][0]['text']
+        assert result['results'][0]['table']=='approved_revenue_summary'
+        with pytest.raises(QueryBlocked):db.query("SELECT SUM(net_revenue) FROM financial_lines WHERE item_type='retail'")
+    finally:db.close()
+
+
+def test_scope_dates_are_verified_but_unbound_money_still_rejected():
+    from analyst_engine import bind_claim_values
+    claim={'text':'Revenue was [[0]] from 7 to 13 September 2026.',
+           'evidence':[{'result':0,'row':0,'column':'amount','format':'money'}]}
+    values=[{'rows':[{'amount':1410}]}]
+    assert bind_claim_values(values,claim,['2026-09-07','2026-09-13'])=='Revenue was AUD 1,410.00 from 2026-09-07 to 2026-09-13.'
+    for text in ('Revenue was 1410.','Revenue was [[0]] on 8 September 2026.','Revenue was [[0]] in 2025.'):
+        with pytest.raises(QueryBlocked):bind_claim_values(values,{**claim,'text':text},['2026-09-07','2026-09-13'])

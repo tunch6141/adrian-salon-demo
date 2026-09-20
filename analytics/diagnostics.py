@@ -60,3 +60,25 @@ def calendar_periods(intake):
       'current_week_elapsed':[str(monday),str(today)],
       'last_complete_month':[str(shift_month(month,-1)),str(month-timedelta(days=1))],
       'monthly_baseline':[str(shift_month(month,-4)),str(shift_month(month,-1)-timedelta(days=1))]}
+
+
+def revenue_diagnostic(db,staff,start,end):
+    """Approved inclusive-period lookup, independent of optional capacity or cost."""
+    from analyst_engine import QueryBlocked
+    from piece1_validation.metrics import revenue
+    if not hasattr(db,'intake') or 'financial_lines' not in db.schema:
+        raise QueryBlocked('Revenue requires the approved financial dataset and entitlement.')
+    names={r['staff_name']:r['staff_id'] for r in db.intake.tables.get('staff',[])}
+    if not set(staff)<=names.keys():raise QueryBlocked('Choose staff in the current business.')
+    a,b=date.fromisoformat(start),date.fromisoformat(end)
+    if a>b:raise QueryBlocked('Revenue dates are reversed.')
+    rows=[]
+    for name in staff or ['Whole business']:
+        value=revenue(db.intake,str(a),str(b+timedelta(days=1)),names.get(name))
+        row={'staff_name':name,'period_start':start,'period_end':end,'coverage':value['status'],
+             'limitations':json.dumps(value.get('limitations',[]))}
+        for output,key in [('service_revenue_aud','service_revenue'),('retail_revenue_aud','product_revenue'),
+                           ('part_revenue_aud','part_revenue'),('total_net_revenue_aud','net_revenue')]:
+            row[output]=float(value[key]) if value['status']=='Available' and value.get(key) is not None else None
+        rows.append(row)
+    return [packet(db.intake,'approved_revenue_summary',rows,f'{start} through {end}')]
