@@ -140,7 +140,7 @@ def test_live_output_schema_cannot_invent_context_references():
         schema.model_validate(sample)
         invalid=deepcopy(sample);invalid['claims'][0]['context_ids']=['invented']
         with pytest.raises(ValidationError):schema.model_validate(invalid)
-        for change in [dict(column='missing'),dict(result=1),dict(row=1)]:
+        for change in [dict(column='missing'),dict(result=1),dict(row=1),dict(format='percent')]:
             invalid=deepcopy(sample);invalid['claims'][0]['evidence'][0].update(change)
             with pytest.raises(ValidationError):schema.model_validate(invalid)
         for text in ['Revenue was about AUD 1,000.','On 17th Sep 2026.','Booking B0004.']:
@@ -262,6 +262,11 @@ def test_commercial_answer_requires_leave_context_and_normalised_service_mix(db)
     safe=narration_evidence(results,p)
     assert safe[2]['rows']==safe[3]['rows']==[] and results[3]['rows']
     assert safe[4]['rows']==mix['rows']
+    assert safe[-1]['rows']==[]
+    named=next(r for r in safe if r['table']=='approved_comparison_summary')['rows'][0]
+    assert named['service_revenue_aud_current_value']==1380
+    assert named['service_revenue_aud_absolute_difference']==1318.75
+    assert named['service_revenue_aud_absolute_percentage_change']==pytest.approx(48.86521537748958)
     a=Answer(claims=[dict(text='Revenue changed.',evidence=[dict(result=0,row=0,column='service_revenue_aud')],context_ids=[])],investigation='',recommendation='',measurement='',missing_information='',chart=dict(kind='none',result=0,x='',y=''))
     notes=[dict(id='CTX1',event_type='annual_leave',start_date='2026-09-08',end_date='2026-09-09')]
     with pytest.raises(QueryBlocked,match='temporary availability'):validate_commercial_labels(db,p,a,results,notes)

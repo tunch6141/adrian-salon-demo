@@ -6,7 +6,7 @@ from typing import Literal,Union
 from pydantic import BaseModel, Field
 from analyst_engine import RULES, QueryBlocked, reference_value, validate_chart, service_diagnostic, bind_claim_values, period_diagnostic
 
-ANSWER_RELEASE = '20 Sep 2026 Â· reasoning 14'
+ANSWER_RELEASE = '20 Sep 2026 · reasoning 15'
 
 class ContextDraft(BaseModel):
     entity: str
@@ -115,12 +115,12 @@ NEVER mentally sum table rows. Use the supplied calculated summary/difference ce
 bookable_hours means available capacity: say 'bookable hours', never 'booked hours'. Completed service hours are completed work, while future booked hours are scheduled work; keep these distinct.
 Do not grade an isolated utilisation percentage as efficient, poor or good without a recorded target or a fair comparison. Say what it measures. Unqueried cost/profit is not missing data: use 'profit was not calculated here' unless actual returned coverage proves unavailable costs.
 For a claim citing owner context, [[context0_start]] and [[context0_end]] insert the dates of the first ID in that claim's context_ids list; context1 refers to its second ID. Use these for note dates that differ from the analysis period. Describe note content as owner-reported, never as an independently verified cause. Avoid quoting numeric amounts from free-text notes as calculated facts.
-When approved_service_mix_comparison is supplied, use its baseline_average_revenue_aud and difference_aud: raw prior multi-week mix totals are not a weekly baseline. Discuss relevant owner-reported leave/closure notes before suggesting operational changes. Temporary leave plus stable utilisation does not establish persistent spare capacity or justify lasting roster cuts. Inspect service mix, compatible future capacity and covered profit before recommending discounts; never assume a revenue decline establishes weak demand. A measured service-category revenue difference is a valid financial explanation, not proof of customer or employee motivation. If the premise is false, correct it first. Compare all relevant categories; do not cherry-pick colouring when highlights offset it.
+For period comparisons use approved_comparison_summary: each column names its metric explicitly, including matched baseline, difference and percentage change. Use absolute_difference or absolute_percentage_change when saying fell by or rose by; signed differences are for change labels. Do not recalculate existing comparisons or request redundant raw rows. When approved_service_mix_comparison is supplied, use its baseline_average_revenue_aud and difference_aud: raw prior multi-week mix totals are not a weekly baseline. Discuss relevant owner-reported leave/closure notes before suggesting operational changes. Temporary leave plus stable utilisation does not establish persistent spare capacity or justify lasting roster cuts. Inspect service mix, compatible future capacity and covered profit before recommending discounts; never assume a revenue decline establishes weak demand. A measured service-category revenue difference is a valid financial explanation, not proof of customer or employee motivation. If the premise is false, correct it first. Compare all relevant categories; do not cherry-pick colouring when highlights offset it.
 For multiple staff sharing x dates/services set chart.series='staff_name' so they get separate lines or grouped bars. Use chart.series='' when no grouping is required.
 You explain business query results. Answer first using at most four short factual claims, each with exact zero-based result/row/column references or context IDs supporting it.
 Keep numbers and entities faithful. Never say stable when value declined. State staff/salon scope and dates. Each claim's entire meaning must follow from its citations. Owner context must be attributed as owner-reported, never verified cause.
 Do not invent numbers, causality, benchmarks, source details or actions taken. No general-knowledge answers. All text must be grounded in returned results, approved rules or retrieved context.
-For lookup/followup: normally 1â€“2 claims and no investigation/recommendation/measurement unless requested. For analysis use a short investigation and chart if useful. For action focus recommendation on the observed evidence; suggestions are not established results. Do not manufacture a recommendation merely to fill a section. Empty string means omit section.
+For lookup/followup: normally 1–2 claims and no investigation/recommendation/measurement unless requested. For analysis use a short investigation and chart if useful. For action focus recommendation on the observed evidence; suggestions are not established results. Do not manufacture a recommendation merely to fill a section. Empty string means omit section.
 For a simple result or trend, the application displays the FULL table automatically. State the main answer and a useful implication, not every row. Booking IDs and timestamps contain digits: cite those string cells with [[0]] just like numeric cells. Use [[start]]/[[end]] for analysis dates; do not repeat a literal year. Do not invent a numeric total or difference that is not a returned cell. Put uncited limitations (such as unavailable causal evidence) in missing_information, not a separate factual claim with empty citations. Mention relevant retrieved owner context with context_ids; absence of a context note is not evidence of no event. A previous day-versus-week comparison is invalid: acknowledge the mismatch and explain the corrected scope, using current returned figures only.
 For revenue trends use approved_trend_totals for the total, minimum/maximum COMPLETE bucket, and first/last change. Never infer extrema by skimming rows or use clipped edge buckets as complete weeks. A request to show a trend needs no recommendation or profit discussion. Optional diagnostics NOT QUERIED are different from data UNAVAILABLE: never say costs/service mix/context do not exist merely because they were unnecessary for this answer. The supplied schema and graph show what can be investigated.
 Charts reference existing result columns only, never supply invented chart values. Choose none if chart isn't useful. Line for time, bar for comparison, pie only composition.
@@ -239,8 +239,8 @@ def narration_evidence(results,plan):
     """Expose matched comparison values to narration; retain raw totals in audit."""
     d=plan.diagnostic
     if not d or d.comparison_divisor<=1:return results
-    return [{**r,'rows':[],'row_count':0,'note':'Raw multi-period baseline is retained in audit only. Use approved_period_comparison and approved_service_mix_comparison, already divided by the stated baseline divisor.'}
-        if r.get('table') in ['approved_staff_summary','approved_service_mix'] and r['rows'] and r['rows'][0].get('period_start')==d.comparison_start_date else r for r in results]
+    return [{**r,'rows':[],'row_count':0,'note':'Raw multi-period baseline is retained in audit only. Use approved_comparison_summary and approved_service_mix_comparison, already divided by the stated baseline divisor.'}
+        if r.get('table')=='approved_period_comparison' or (r.get('table') in ['approved_staff_summary','approved_service_mix'] and r['rows'] and r['rows'][0].get('period_start')==d.comparison_start_date) else r for r in results]
 
 
 def structured(client,model,schema,instructions,payload):
@@ -259,8 +259,16 @@ def structured(client,model,schema,instructions,payload):
         for i,result in enumerate(payload.get('results',[])):
             if not result['rows']:continue
             columns=tuple(dict.fromkeys(k for row in result['rows'] for k in row))
-            citations.append(create_model(f'Result{i}Citation',__base__=Citation,
-                result=(Literal[i],...),row=(int,Field(ge=0,le=len(result['rows'])-1)),column=(Literal[columns],...)))
+            groups={'plain':[],'money':[],'percent':[]}
+            for col in columns:
+                lowered=col.lower()
+                style='percent' if any(x in lowered for x in ['percentage','percent','_pct']) else 'money' if any(x in lowered for x in ['revenue','_aud','profit','cost','amount','price','balance']) else 'plain'
+                groups[style].append(col)
+            for style,fields in groups.items():
+                if not fields:continue
+                formats=('plain',style) if style!='plain' else ('plain',)
+                citations.append(create_model(f'Result{i}{style}Citation',__base__=Citation,
+                    result=(Literal[i],...),row=(int,Field(ge=0,le=len(result['rows'])-1)),column=(Literal[tuple(fields)],...),format=(Literal[formats],style)))
         citation_type=Union[tuple(citations)] if len(citations)>1 else citations[0] if citations else Citation
         evidence_field=Field(default_factory=list) if citations else Field(default_factory=list,max_length=0)
         text_part=create_model('TextPart',kind=(Literal['text'],...),text=(str,Field(pattern=r'^[^0-9\[\]{}\uFFFC\uFFFD]*$')))

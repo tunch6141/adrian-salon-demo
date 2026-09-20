@@ -83,7 +83,16 @@ def period_diagnostic(db,staff,start,end,old_start,old_end,divisor):
             'difference_aud':actual-baseline if baseline is not None else None,'current_start':start,'current_end':end,
             'baseline_start':old_start,'baseline_end':old_end})
     scope=f'{start} to {end} versus {old_start} to {old_end}; baseline totals divided by {divisor}'
-    return current+previous+[packet(db.intake,'approved_service_mix_comparison',mix,scope),packet(db.intake,'approved_period_comparison',rows,scope)]
+    named={}
+    for row in rows:
+        person=named.setdefault(row['staff_name'],{'staff_name':row['staff_name'],'current_start':start,'current_end':end,'baseline_start':old_start,'baseline_end':old_end,'baseline_divisor':divisor})
+        metric=row['metric']
+        for field in ['current_value','baseline_value','difference','percentage_change']:
+            person[metric+'_'+field]=row[field]
+        person[metric+'_absolute_difference']=abs(row['difference']) if row['difference'] is not None else None
+        person[metric+'_absolute_percentage_change']=abs(row['percentage_change']) if row['percentage_change'] is not None else None
+    for row in mix:row['absolute_difference_aud']=abs(row['difference_aud']) if row['difference_aud'] is not None else None
+    return current+previous+[packet(db.intake,'approved_service_mix_comparison',mix,scope),packet(db.intake,'approved_comparison_summary',list(named.values()),scope),packet(db.intake,'approved_period_comparison',rows,scope)]
 
 def calendar_periods(intake):
     today=intake.asof.date();monday=today-timedelta(days=today.weekday());last=monday-timedelta(days=7)
