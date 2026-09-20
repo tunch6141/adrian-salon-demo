@@ -27,14 +27,17 @@ class DynamicTests(unittest.TestCase):
     def test_reviewer_corrects_instead_of_suppressing_everything(self):
         draft=self.answer(claims=[dict(text='Sarah is lazy.',evidence=[dict(result=0,row=0,column='revenue')],context_ids=[])])
         corrected=self.answer(claims=[dict(text='Sarah recorded [[0]] service revenue. These records do not establish employee effort.',evidence=[dict(result=0,row=0,column='revenue',format='money')],context_ids=[])])
-        with patch('analyst_ai.structured',side_effect=[self.p,draft,Review(approved=True,issues=['Removed unsupported judgement'],revised_answer=corrected)]):r=investigate(None,'test',self.db,'How did Sarah do?',[],ContextStore())
+        with patch('analyst_ai.structured',side_effect=[self.p,draft,Review(approved=True,issues=['Removed unsupported judgement'],revised_answer=corrected)]) as calls:r=investigate(None,'test',self.db,'How did Sarah do?',[],ContextStore())
+        self.assertEqual(calls.call_args.args[-1]['answer'],draft.model_dump())
         self.assertEqual(r['status'],'answered')
         self.assertNotIn('lazy',str(r['answer']))
         self.assertIn('25,300.00',r['answer']['claims'][0]['text'])
     def test_revised_answer_cannot_invent_numbers(self):
         a=self.answer(claims=[dict(text='Revenue [[0]].',evidence=[dict(result=0,row=0,column='revenue')],context_ids=[])])
         bad=a.model_copy(deep=True);bad.claims[0].text='Revenue was 999999.'
-        with patch('analyst_ai.structured',side_effect=[self.p,a,Review(approved=True,issues=[],revised_answer=bad)]):r=investigate(None,'test',self.db,'Revenue?',[],ContextStore())
+        with patch('analyst_ai.structured',side_effect=[self.p,a,Review(approved=True,issues=[],revised_answer=bad)]) as calls:r=investigate(None,'test',self.db,'Revenue?',[],ContextStore())
+        self.assertIn('[[0]]',calls.call_args.args[-1]['answer']['claims'][0]['text'])
+        self.assertNotIn('[[0]]',calls.call_args.args[-1]['rendered_answer']['claims'][0]['text'])
         self.assertEqual(r['status'],'facts_only')
     def test_query_loop_bounded(self):
         a=self.answer(additional_queries=self.p.queries)

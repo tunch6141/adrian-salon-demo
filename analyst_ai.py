@@ -210,6 +210,8 @@ def _investigate(client,model,db,question,history,context_store,stage):
         if failed:return failed
 
     issues=[]
+    period_scope = plan.revenue or plan.diagnostic
+    evidence_periods = [period_scope.start_date,period_scope.end_date] if period_scope else [plan.context_start,plan.context_end]
     # One formatting repair only: reuse evidence rather than replanning and rerunning SQL.
     for attempt in range(2):
         try:
@@ -219,7 +221,7 @@ def _investigate(client,model,db,question,history,context_store,stage):
             for claim in bound.claims:
                 if not claim.evidence and not claim.context_ids:raise QueryBlocked('A factual claim has no evidence.')
                 if not set(claim.context_ids)<=set(c['id'] for c in contexts):raise QueryBlocked('Unknown context citation')
-                claim.text=bind_claim_values(results,claim.model_dump(),[plan.diagnostic.start_date,plan.diagnostic.end_date] if plan.diagnostic else [plan.context_start,plan.context_end])
+                claim.text=bind_claim_values(results,claim.model_dump(),evidence_periods)
             validate_chart(results,bound.chart.model_dump())
             break
         except QueryBlocked as error:
@@ -229,7 +231,11 @@ def _investigate(client,model,db,question,history,context_store,stage):
             stage('Correcting the answer formatting')
             answer=structured(client,model,Answer,WRITER+'\n'+rules,{**payload,'formatting_issue':issues,'draft':answer.model_dump()})
     stage('Checking the explanation against the evidence')
-    review=structured(client,model,Review,REVIEWER+'\n'+WRITER+'\n'+rules,{**payload,'answer':bound.model_dump(),'placeholder_draft':answer.model_dump()})
+    review=structured(client,model,Review,REVIEWER+'\n'+WRITER+'\n'+rules+
+        '\nThe answer field is the editable evidence-placeholder draft. rendered_answer is read-only display text. '
+        'If the draft is correct, approve it with revised_answer=null. If revising, edit the placeholder draft: '
+        'retain [[0]] and date placeholders and citations; never copy displayed numeric literals into revised_answer.',
+        {**payload,'answer':answer.model_dump(),'rendered_answer':bound.model_dump()})
     if not review.approved:
         return {'plan':plan.model_dump(),'answer':None,'results':results,'contexts':contexts,'status':'facts_only','issues':review.issues}
     if review.revised_answer is not None:
@@ -240,7 +246,7 @@ def _investigate(client,model,db,question,history,context_store,stage):
             for claim in bound.claims:
                 if not claim.evidence and not claim.context_ids:raise QueryBlocked('A factual claim has no evidence.')
                 if not set(claim.context_ids)<=set(c['id'] for c in contexts):raise QueryBlocked('Unknown context citation')
-                claim.text=bind_claim_values(results,claim.model_dump(),[plan.diagnostic.start_date,plan.diagnostic.end_date] if plan.diagnostic else [plan.context_start,plan.context_end])
+                claim.text=bind_claim_values(results,claim.model_dump(),evidence_periods)
             validate_chart(results,bound.chart.model_dump())
         except QueryBlocked as error:
             return {'plan':plan.model_dump(),'answer':None,'results':results,'contexts':contexts,'status':'facts_only','issues':[str(error)]}

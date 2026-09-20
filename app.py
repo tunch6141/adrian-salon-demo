@@ -130,7 +130,7 @@ def main():
     </style>''', unsafe_allow_html=True)
     st.caption('ADRIAN’S SALON · BUSINESS INSIGHTS')
     st.title('Know what changed. Decide what to do.')
-    st.caption('Synthetic demo · Persistent data pipeline · 20 September 2026')
+    st.caption('Synthetic demo · Persistent data pipeline · 20 September 2026 · Revision 2')
     view = st.radio('View', ['Ask your salon', 'Business evidence', 'Legacy demo'], horizontal=True)
     if view == 'Ask your salon':
         from analyst_ui import render
