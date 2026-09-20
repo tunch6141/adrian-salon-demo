@@ -154,7 +154,9 @@ def structured(client,model,schema,instructions,payload):
         citation_type=Union[tuple(citations)] if len(citations)>1 else citations[0] if citations else Citation
         evidence_field=Field(default_factory=list) if citations else Field(default_factory=list,max_length=0)
         claim_type=create_model('EvidenceClaim',__base__=Claim,context_ids=(context_type,context_field),
-            evidence=(list[citation_type],evidence_field))
+            evidence=(list[citation_type],evidence_field),
+            text=(str,Field(pattern=r'^(?:[^0-9\[\]]|\[\[(?:[0-9]+|start|end|context[0-9]+_(?:start|end))\]\])*$',
+                description='Write prose with all numeric facts, dates, years and IDs containing digits inserted through [[0]], [[1]], [[start]], [[end]] or cited context date placeholders. Never type literal digits.')))
         answer_type=create_model('Answer',__base__=Answer,claims=(list[claim_type],Field(max_length=4)))
         schema=answer_type if schema is Answer else create_model('Review',__base__=Review,revised_answer=(answer_type|None,None))
     started=time.monotonic()
@@ -218,8 +220,9 @@ def _investigate(client,model,db,question,history,context_store,stage):
     if plan.intent=='method' and history and hasattr(db,'intake'):
         from analytics.diagnostics import packet,comparable_periods
         from datetime import date
-        prior=next((h for h in reversed(history) if h.get('plan',{}).get('diagnostic') or h.get('plan',{}).get('revenue') or h.get('plan',{}).get('trend')),None)
-        if prior:
+        prior=next((h for h in reversed(history) if h.get('status') not in ['clarify','unsupported','context']),None)
+        has_module=prior and any(prior.get('plan',{}).get(k) for k in ['diagnostic','revenue','trend'])
+        if has_module:
             old_plan=prior['plan'];scope=old_plan.get('diagnostic') or old_plan.get('revenue') or old_plan.get('trend')
             start,end=scope['start_date'],scope['end_date']
             old_start,old_end=scope.get('comparison_start_date',''),scope.get('comparison_end_date','')
@@ -238,6 +241,11 @@ def _investigate(client,model,db,question,history,context_store,stage):
                 plan.diagnostic=Diagnostic(staff=scope['staff'],start_date=start,end_date=end);plan.revenue=None
             else:
                 plan.revenue=RevenueRequest(staff=scope['staff'],start_date=start,end_date=end);plan.diagnostic=None
+        elif prior:
+            results.append(packet(db.intake,'previous_calculation_scope',[{
+                'previous_question':prior['question'],'scope':prior['plan']['scope'],
+                'executed_queries':json.dumps(prior.get('retrieved_scopes') or prior['plan'].get('queries',[])),
+                'previous_status':prior['status']}], 'Previous application query metadata'))
     repair_budget=2
     def run_queries(queries):
         nonlocal repair_budget

@@ -125,6 +125,9 @@ def test_live_output_schema_cannot_invent_context_references():
         for change in [dict(column='missing'),dict(result=1),dict(row=1)]:
             invalid=deepcopy(sample);invalid['claims'][0]['evidence'][0].update(change)
             with pytest.raises(ValidationError):schema.model_validate(invalid)
+        for text in ['Revenue was about AUD 1,000.','On 17th Sep 2026.','Booking B0004.']:
+            invalid=deepcopy(sample);invalid['claims'][0]['text']=text
+            with pytest.raises(ValidationError):schema.model_validate(invalid)
         if contexts:
             valid=deepcopy(sample);valid['claims'][0]['context_ids']=['CTX1'];schema.model_validate(valid)
 
