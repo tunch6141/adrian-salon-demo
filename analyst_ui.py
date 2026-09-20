@@ -13,6 +13,31 @@ from business_context import ContextStore
 def safe_text(text):st.markdown(text.replace('$',r'\$'))
 
 
+def diagnostic_facts(item):
+    """Present approved module values directly; the model explains their meaning."""
+    diagnostic=item.get('plan',{}).get('diagnostic')
+    if not diagnostic:return []
+    results=item.get('results',[])
+    current=next((r['rows'] for r in results if r.get('table')=='approved_staff_summary'),[])
+    comparisons=next((r['rows'] for r in results if r.get('table')=='approved_comparison_summary'),[])
+    compared={r['staff_name']:r for r in comparisons}
+    lines=[]
+    for row in current:
+        start,end=diagnostic['start_date'],diagnostic['end_date']
+        period=start if start==end else f'{start} to {end}'
+        text=f"{row['staff_name']} · {period}: service revenue AUD {row['service_revenue_aud']:,.2f}."
+        if row.get('completed_appointments') is not None:text+=f" {row['completed_appointments']:g} completed appointments; {row['completed_service_hours']:g} completed service hours."
+        if row.get('bookable_hours') is not None:text+=f" {row['bookable_hours']:g} bookable hours"
+        if row.get('realised_utilisation_pct') is not None:text+=f"; utilisation {row['realised_utilisation_pct']:.2f}%"
+        text=text.rstrip('.')+'.'
+        if row.get('revenue_per_service_hour') is not None:text+=f" Service revenue per completed service hour: AUD {row['revenue_per_service_hour']:,.2f}."
+        prior=compared.get(row['staff_name'])
+        if prior and prior.get('service_revenue_aud_baseline_value') is not None:
+            text+=f" Baseline {prior['baseline_start']} to {prior['baseline_end']} (total divided by {prior['baseline_divisor']}): AUD {prior['service_revenue_aud_baseline_value']:,.2f}. Revenue change: AUD {prior['service_revenue_aud_difference']:+,.2f} ({prior['service_revenue_aud_percentage_change']:+.2f}%)."
+        lines.append(text)
+    return lines
+
+
 def build_chart(df,chart):
     x,y=chart['x'],chart['y']
     series=chart.get('series','')
@@ -58,6 +83,7 @@ def render_result(item):
         st.warning('The evidence check did not approve an answer. I have withheld the explanation; you can inspect the query results below or ask a narrower question.')
     else:
         a=item['answer']
+        for fact in diagnostic_facts(item):safe_text(fact)
         if item['plan'].get('booking_id'):
             for result in item['results']:
                 for row in result['rows']:

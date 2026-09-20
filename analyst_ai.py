@@ -6,7 +6,7 @@ from typing import Literal,Union
 from pydantic import BaseModel, Field
 from analyst_engine import RULES, QueryBlocked, reference_value, validate_chart, service_diagnostic, bind_claim_values, period_diagnostic
 
-ANSWER_RELEASE = '20 Sep 2026 · reasoning 15'
+ANSWER_RELEASE = '20 Sep 2026 · reasoning 16'
 
 class ContextDraft(BaseModel):
     entity: str
@@ -273,7 +273,9 @@ def structured(client,model,schema,instructions,payload):
         evidence_field=Field(default_factory=list) if citations else Field(default_factory=list,max_length=0)
         text_part=create_model('TextPart',kind=(Literal['text'],...),text=(str,Field(pattern=r'^[^0-9\[\]{}\uFFFC\uFFFD]*$')))
         parts=[text_part]
-        if citations:parts.append(create_model('ValuePart',kind=(Literal['value'],...),citation=(citation_type,...)))
+        if citations and not payload.get('plan',{}).get('diagnostic'):parts.append(create_model('ValuePart',kind=(Literal['value'],...),citation=(citation_type,...)))
+        if payload.get('plan',{}).get('diagnostic'):
+            instructions+='\nSTAFF DIAGNOSTIC DISPLAY: The application prints exact revenue, hours, utilisation and matching baseline figures directly from the approved module. Your claims explain their meaning and measured drivers qualitatively, with evidence citations, without repeating numerical values or IDs. Do not spell out monetary amounts or percentages. Distinguish reduced completed work, changed available capacity and changed service value/mix. Do not call completed service hours actual hours worked. Context reports may be consistent with changes but do not establish their cause.'
         p=payload.get('plan',{});scope=p.get('trend') or p.get('revenue') or p.get('diagnostic') or {}
         start=scope.get('start_date') or p.get('context_start');end=scope.get('end_date') or p.get('context_end')
         periods=tuple((['start','year'] if start else [])+(['end'] if end else []))

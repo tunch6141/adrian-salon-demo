@@ -286,3 +286,13 @@ def test_new_explicit_staff_scope_does_not_inherit_previous_comparison():
     p.trend.staff=['Sarah','Matthew']
     preserve_explicit_staff_scope(p,'Compare Sarah against him for August',people)
     assert p.trend.staff==['Sarah','Matthew']
+
+
+def test_staff_display_uses_exact_module_values_and_matched_baseline(db):
+    from analyst_ui import diagnostic_facts
+    d=dict(staff=['Sarah'],start_date='2026-09-07',end_date='2026-09-13',comparison_start_date='2026-08-10',comparison_end_date='2026-09-06',comparison_divisor=4)
+    results=period_diagnostic(db,['Sarah'],'2026-09-07','2026-09-13','2026-08-10','2026-09-06',4)
+    text=diagnostic_facts(dict(plan=dict(diagnostic=d),results=results))[0]
+    assert 'AUD 1,380.00' in text and 'AUD 2,698.75' in text and '-48.87%' in text
+    assert '18 completed service hours' in text and '22 bookable hours' in text
+    assert 'AUD -1,318.75' in text and '81.82%' in text
