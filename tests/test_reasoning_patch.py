@@ -164,3 +164,14 @@ def test_method_followup_uses_previous_scope_without_inventing_comparison(db):
     scope=result['results'][0]['rows'][0]
     assert scope['current_days']==1 and scope['comparison_used'] is False
     assert result['results'][1]['rows'][0]['service_revenue_aud']==420
+
+def test_unqueried_costs_are_not_missing_and_utilisation_has_no_invented_target(db):
+    from analyst_ai import validate_commercial_labels
+    p=Plan(intent='analysis',scope='Sarah day',missing_information='',queries=[],context_entity='Sarah',context_start='2026-09-17',context_end='2026-09-17',draft=None,
+        diagnostic=Diagnostic(staff=['Sarah'],start_date='2026-09-17',end_date='2026-09-17'))
+    a=Answer(claims=[],investigation='',recommendation='',measurement='',missing_information='Direct cost or gross profit data for Sarah is not available.',chart=dict(kind='none',result=0,x='',y=''))
+    with pytest.raises(QueryBlocked):validate_commercial_labels(db,p,a,[])
+    a.missing_information='Profit was not calculated in this answer.'
+    validate_commercial_labels(db,p,a,[])
+    a.investigation='Sarah made reasonably efficient use of her capacity.'
+    with pytest.raises(QueryBlocked):validate_commercial_labels(db,p,a,[])

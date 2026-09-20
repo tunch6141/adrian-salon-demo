@@ -103,6 +103,7 @@ DYNAMIC INVESTIGATION: If the results do not yet answer the question, return add
 OUTPUT NUMBERS THROUGH PLACEHOLDERS ONLY. In claim.text use [[0]], [[1]] etc referencing that claim's evidence list, with Citation.format plain/money/percent. The application inserts the exact cited values. Do not type ANY numeric facts or years into claim.text. [[start]] and [[end]] insert current context dates. Example: text='Sam recorded [[0]] service revenue in August.', evidence=[{result:0,row:0,column:'service_revenue_aud',format:'money'}]. A percent-formatted value is already a percent, not a ratio; do not multiply it. Use the approved period comparison's percentage_change for changes. All other sections should avoid numerical claims and refer to the cited findings.
 NEVER mentally sum table rows. Use the supplied calculated summary/difference cells, or request a correction to the queries. Every quantitative fact in a claim must be a placeholder bound to an appropriate cited cell. Use completed service hours, NOT hours worked/attendance.
 bookable_hours means available capacity: say 'bookable hours', never 'booked hours'. Completed service hours are completed work, while future booked hours are scheduled work; keep these distinct.
+Do not grade an isolated utilisation percentage as efficient, poor or good without a recorded target or a fair comparison. Say what it measures. Unqueried cost/profit is not missing data: use 'profit was not calculated here' unless actual returned coverage proves unavailable costs.
 For a claim citing owner context, [[context0_start]] and [[context0_end]] insert the dates of the first ID in that claim's context_ids list; context1 refers to its second ID. Use these for note dates that differ from the analysis period. Describe note content as owner-reported, never as an independently verified cause. Avoid quoting numeric amounts from free-text notes as calculated facts.
 A measured service-category revenue difference is a valid financial explanation, not proof of customer or employee motivation. If the premise is false, correct it first. Compare all relevant categories; do not cherry-pick colouring when highlights offset it.
 For multiple staff sharing x dates/services set chart.series='staff_name' so they get separate lines or grouped bars. Use chart.series='' when no grouping is required.
@@ -169,6 +170,26 @@ def structured(client,model,schema,instructions,payload):
 
 from contextvars import ContextVar
 ACTIVE_STATS=ContextVar('analyst_stage_timings',default=None)
+
+
+def validate_commercial_labels(db,plan,answer,results):
+    """Check availability and benchmark claims against the actual scoped data."""
+    import re
+    prose=' '.join([c.text for c in answer.claims]+[answer.investigation,answer.recommendation,answer.measurement,answer.missing_information])
+    if '\ufffc' in prose or '\ufffd' in prose:
+        raise QueryBlocked('Remove replacement characters. Use evidence placeholders for dates and values, or omit them from optional sections.')
+    if not any(r.get('table')=='approved_period_comparison' for r in results):
+        if re.search(r'\b(reasonably efficient|efficient use of|good utilisation|poor utilisation)\b',prose,re.I):
+            raise QueryBlocked('An isolated utilisation percentage has no established efficiency benchmark. State the measured utilisation without grading it as good, poor or efficient.')
+    scope=plan.trend or plan.revenue or plan.diagnostic
+    if scope and hasattr(db,'intake') and 'financial_lines' in db.frames:
+        f=db.frames['financial_lines']
+        selected=f[(f.posted_date>=scope.start_date)&(f.posted_date<=scope.end_date)]
+        if scope.staff:selected=selected[selected.staff_name.isin(scope.staff)]
+        if len(selected) and selected.direct_cost.notna().all() and selected.gross_profit.notna().all():
+            pattern=r'(direct costs?|gross profit).{0,100}(not available|unavailable|missing|unknown)|(?:no|missing|unavailable).{0,40}(direct costs?|gross profit)'
+            if re.search(pattern,prose,re.I):
+                raise QueryBlocked('The scoped cleaned sales have direct costs and gross profit available. Do not call them missing/unavailable. If profit was not calculated in these results, say it was not calculated here.')
 
 
 def investigate(client,model,db,question,history,context_store,on_stage=None):
@@ -351,6 +372,7 @@ def _investigate(client,model,db,question,history,context_store,stage):
     for attempt in range(2):
         try:
             bound=answer.model_copy(deep=True)
+            validate_commercial_labels(db,plan,bound,results)
             if bound.additional_queries:raise QueryBlocked('The answer requested unexecuted queries.')
             if not bound.claims:raise QueryBlocked('The explanation must include supported findings.')
             for claim in bound.claims:
@@ -376,6 +398,7 @@ def _investigate(client,model,db,question,history,context_store,stage):
     if review.revised_answer is not None:
         bound=review.revised_answer.model_copy(deep=True)
         try:
+            validate_commercial_labels(db,plan,bound,results)
             if bound.additional_queries:raise QueryBlocked('The reviewed answer requested unexecuted queries.')
             if not bound.claims:raise QueryBlocked('No supported answer was supplied.')
             for claim in bound.claims:
