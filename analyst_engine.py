@@ -267,6 +267,7 @@ def bind_claim_values(results,claim,periods,contexts=()):
     refs=claim['evidence']
     text=claim['text']
     import unicodedata
+    text=''.join(str(unicodedata.decimal(c)) if unicodedata.category(c)=='Nd' else c for c in text)
     if any(ord(c)>127 and unicodedata.category(c) in ['Nl','No'] for c in text):
         raise QueryBlocked('Remove invented numeric symbols or placeholder glyphs; use the structured period/value parts for values.')
     if '\ufffc' in text or '\ufffd' in text or '{{' in text or '}}' in text:

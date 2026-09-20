@@ -6,7 +6,7 @@ from typing import Literal,Union
 from pydantic import BaseModel, Field
 from analyst_engine import RULES, QueryBlocked, reference_value, validate_chart, service_diagnostic, bind_claim_values, period_diagnostic
 
-ANSWER_RELEASE = '20 Sep 2026 · reasoning 20'
+ANSWER_RELEASE = '20 Sep 2026 · reasoning 21'
 
 class ContextDraft(BaseModel):
     entity: str
@@ -277,7 +277,7 @@ def structured(client,model,schema,instructions,payload):
                     result=(Literal[i],...),row=(int,Field(ge=0,le=len(result['rows'])-1)),column=(Literal[tuple(fields)],...),format=(Literal[formats],style)))
         citation_type=Union[tuple(citations)] if len(citations)>1 else citations[0] if citations else Citation
         evidence_field=Field(default_factory=list) if citations else Field(default_factory=list,max_length=0)
-        text_part=create_model('TextPart',kind=(Literal['text'],...),text=(str,Field(pattern=r'^[^0-9\[\]{}\uFFFC\uFFFD]*$')))
+        text_part=create_model('TextPart',kind=(Literal['text'],...),text=(str,Field(pattern=r'^[^\[\]{}\uFFFC\uFFFD]*$')))
         parts=[text_part]
         if citations and not payload.get('plan',{}).get('diagnostic'):parts.append(create_model('ValuePart',kind=(Literal['value'],...),citation=(citation_type,...)))
         if payload.get('plan',{}).get('diagnostic'):

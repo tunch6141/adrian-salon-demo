@@ -145,7 +145,9 @@ def test_live_output_schema_cannot_invent_context_references():
             with pytest.raises(ValidationError):schema.model_validate(invalid)
         for text in ['Revenue was about AUD 1,000.','On 17th Sep 2026.','Booking B0004.']:
             invalid=deepcopy(sample);invalid['claims'][0]['parts'][0]['text']=text
-            with pytest.raises(ValidationError):schema.model_validate(invalid)
+            from analyst_ai import decode_answer_parts
+            decoded=decode_answer_parts(schema.model_validate(invalid))
+            with pytest.raises(QueryBlocked):bind_claim_values([{'rows':[{'amount':420}]}],decoded.claims[0].model_dump(),['',''])
         if contexts:
             valid=deepcopy(sample);valid['claims'][0]['context_ids']=['CTX1'];schema.model_validate(valid)
             assert answer.context_review[0].context_id=='CTX1'
