@@ -196,7 +196,8 @@ def _investigate(client,model,db,question,history,context_store,stage):
     contexts=context_store.search(plan.context_entity,plan.context_start,plan.context_end)
     selected_scope=plan.trend or plan.revenue or plan.diagnostic
     if selected_scope:
-        for name in selected_scope.staff:
+        contexts=[]
+        for name in selected_scope.staff or ['Salon']:
             contexts+=context_store.search(name,selected_scope.start_date,selected_scope.end_date)
         contexts=list({r['id']:r for r in contexts}.values())
     if plan.diagnostic and plan.diagnostic.comparison_start_date:

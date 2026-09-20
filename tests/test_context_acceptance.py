@@ -29,7 +29,7 @@ def test_relevant_context_reaches_writer_and_reviewer_without_changing_revenue()
         dict(id='wrong-period',entity='Sarah',start_date='2026-08-01',end_date='2026-08-02',status='active',explanation='Old')]))
     plan=Plan(intent='lookup',scope='Sarah revenue and context',missing_information='',queries=[],
         revenue=RevenueRequest(staff=['Sarah'],start_date='2026-09-07',end_date='2026-09-13'),
-        context_entity='Sarah',context_start='2026-09-07',context_end='2026-09-13',draft=None)
+        context_entity='',context_start='',context_end='',draft=None)
     answer=Answer(claims=[
         dict(text='Sarah recorded [[0]] net revenue.',evidence=[dict(result=0,row=0,column='total_net_revenue_aud',format='money')],context_ids=[]),
         dict(text='The owner reported leave from 8 to 9 September 2026; this does not establish the cause of a revenue change.',evidence=[],context_ids=['CTX1'])],
