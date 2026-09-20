@@ -229,3 +229,16 @@ def test_equivalent_revenue_sql_uses_calendar_module_without_changing_fallback()
     for custom in [q.replace("staff_name='Sarah'","staff_name LIKE 'S%'"),q.replace('SUM(net_revenue)','SUM(net_revenue)*2'),
         q.replace("item_type='service'","booking_source='phone'"),q.replace("AND item_type", "OR item_type")]:
         assert canonical_trend_request([custom]) is None
+
+
+def test_show_trend_has_complete_calendar_summary_without_narrator_guessing(db):
+    from analyst_ai import TrendRequest
+    p=Plan(intent='lookup',scope='Sarah May to August',missing_information='',queries=[],context_entity='Sarah',context_start='2026-05-01',context_end='2026-08-31',draft=None,
+        trend=TrendRequest(staff=['Sarah'],start_date='2026-05-01',end_date='2026-08-31',grain='week',category='service'))
+    with patch('analyst_ai.structured',return_value=p) as calls:
+        result=investigate(None,'gpt-4.1-mini',db,'Show the weekly service revenue',[],ContextStore())
+    assert result['status']=='answered' and calls.call_count==1
+    assert result['results'][0]['row_count']==19
+    text=result['answer']['claims'][0]['text']
+    assert '35,340.00' in text and '1,030.00' in text and '2,780.00' in text and 'fluctuated' in text
+    assert '140.00' not in text and '720.00' not in text
