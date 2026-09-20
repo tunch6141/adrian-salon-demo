@@ -95,6 +95,7 @@ WRITER='''You are a commercial analyst helping a small business owner decide wha
 DYNAMIC INVESTIGATION: If the results do not yet answer the question, return additional_queries with up to three new SELECTs under the planner's SQL restrictions, empty claims and chart.kind=none. For example query the service mix after discovering a revenue-per-hour difference, or retrieve a baseline to test a decline. You may do this for at most two rounds, indicated by remaining_analysis_rounds. When sufficient, additional_queries=[] and give the answer. At the limit, give supported partial findings and explicitly identify what remains unknown. Never pretend a suggested query was executed.
 OUTPUT NUMBERS THROUGH PLACEHOLDERS ONLY. In claim.text use [[0]], [[1]] etc referencing that claim's evidence list, with Citation.format plain/money/percent. The application inserts the exact cited values. Do not type ANY numeric facts or years into claim.text. [[start]] and [[end]] insert current context dates. Example: text='Sam recorded [[0]] service revenue in August.', evidence=[{result:0,row:0,column:'service_revenue_aud',format:'money'}]. A percent-formatted value is already a percent, not a ratio; do not multiply it. Use the approved period comparison's percentage_change for changes. All other sections should avoid numerical claims and refer to the cited findings.
 NEVER mentally sum table rows. Use the supplied calculated summary/difference cells, or request a correction to the queries. Every quantitative fact in a claim must be a placeholder bound to an appropriate cited cell. Use completed service hours, NOT hours worked/attendance.
+For a claim citing owner context, [[context0_start]] and [[context0_end]] insert the dates of the first ID in that claim's context_ids list; context1 refers to its second ID. Use these for note dates that differ from the analysis period. Describe note content as owner-reported, never as an independently verified cause. Avoid quoting numeric amounts from free-text notes as calculated facts.
 A measured service-category revenue difference is a valid financial explanation, not proof of customer or employee motivation. If the premise is false, correct it first. Compare all relevant categories; do not cherry-pick colouring when highlights offset it.
 For multiple staff sharing x dates/services set chart.series='staff_name' so they get separate lines or grouped bars. Use chart.series='' when no grouping is required.
 You explain business query results. Answer first using at most four short factual claims, each with exact zero-based result/row/column references or context IDs supporting it.
@@ -221,7 +222,7 @@ def _investigate(client,model,db,question,history,context_store,stage):
             for claim in bound.claims:
                 if not claim.evidence and not claim.context_ids:raise QueryBlocked('A factual claim has no evidence.')
                 if not set(claim.context_ids)<=set(c['id'] for c in contexts):raise QueryBlocked('Unknown context citation')
-                claim.text=bind_claim_values(results,claim.model_dump(),evidence_periods)
+                claim.text=bind_claim_values(results,claim.model_dump(),evidence_periods,contexts)
             validate_chart(results,bound.chart.model_dump())
             break
         except QueryBlocked as error:
@@ -246,7 +247,7 @@ def _investigate(client,model,db,question,history,context_store,stage):
             for claim in bound.claims:
                 if not claim.evidence and not claim.context_ids:raise QueryBlocked('A factual claim has no evidence.')
                 if not set(claim.context_ids)<=set(c['id'] for c in contexts):raise QueryBlocked('Unknown context citation')
-                claim.text=bind_claim_values(results,claim.model_dump(),evidence_periods)
+                claim.text=bind_claim_values(results,claim.model_dump(),evidence_periods,contexts)
             validate_chart(results,bound.chart.model_dump())
         except QueryBlocked as error:
             return {'plan':plan.model_dump(),'answer':None,'results':results,'contexts':contexts,'status':'facts_only','issues':[str(error)]}

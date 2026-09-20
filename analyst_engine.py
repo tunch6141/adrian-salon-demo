@@ -227,7 +227,7 @@ def validate_claim_numbers(results,claim,context_ids,periods):
             raise QueryBlocked('A number in the answer is not present in its cited results. Retrieve a calculated total or difference.')
 
 
-def bind_claim_values(results,claim,periods):
+def bind_claim_values(results,claim,periods,contexts=()):
     """Bind numeric facts from result cells, instead of auditing model-typed numbers."""
     import re
     refs=claim['evidence']
@@ -235,27 +235,39 @@ def bind_claim_values(results,claim,periods):
     # Canonicalise only dates exactly equal to the trusted calculation scope.
     # Monetary values still require evidence slots, even when their digits resemble a date.
     from datetime import date
-    dates=[]
-    for key,value in zip(('start','end'),periods):
+    slots=dict(zip(('start','end'),periods))
+    pairs=[('start','end')]
+    by_id={c['id']:c for c in contexts}
+    for i,context_id in enumerate(claim.get('context_ids',[])):
+        if context_id not in by_id:raise QueryBlocked('Unknown context citation')
+        pair=(f'context{i}_start',f'context{i}_end')
+        pairs.append(pair)
+        for key,field in zip(pair,('start_date','end_date')):
+            slots[key]=by_id[context_id].get(field,'')
+    dates={}
+    for key,value in slots.items():
         try: day=date.fromisoformat(value)
         except (ValueError,TypeError):continue
-        dates.append(day)
+        dates[key]=day
         for token in (day.isoformat(),f'{day.day} {day:%B %Y}',f'{day.day} {day:%b %Y}'):
             text=re.sub(r'(?<![\w.])'+re.escape(token)+r'(?!\w)','[['+key+']]',text)
-    if len(dates)==2 and (dates[0].year,dates[0].month)==(dates[1].year,dates[1].month):
-        a,b=dates
+    for first,last in pairs:
+        if first not in dates or last not in dates:continue
+        a,b=dates[first],dates[last]
+        if (a.year,a.month)!=(b.year,b.month):continue
         for month in (a.strftime('%B'),a.strftime('%b')):
             pattern=rf'(?<![\w.]){a.day}\s*(?:to|–|-)\s*{b.day} {month} {a.year}(?!\w)'
-            text=re.sub(pattern,'[[start]] to [[end]]',text)
+            text=re.sub(pattern,f'[[{first}]] to [[{last}]]',text)
         # The end date may already have been canonicalised above.
-        text=re.sub(rf'(?<![\w.]){a.day}\s*(?:to|–|-)\s*\[\[end\]\]','[[start]] to [[end]]',text)
-    without_slots=re.sub(r'\[\[(?:\d+|start|end)\]\]','',text)
+        text=re.sub(rf'(?<![\w.]){a.day}\s*(?:to|–|-)\s*\[\[{last}\]\]',f'[[{first}]] to [[{last}]]',text)
+    slot_pattern=r'\[\[(\d+|start|end|context\d+_(?:start|end))\]\]'
+    without_slots=re.sub(slot_pattern,'',text)
     if re.search(r'\d',without_slots):
         raise QueryBlocked('Use evidence placeholders for numbers, including years; do not type numerical facts.')
     def replace(match):
         key=match.group(1)
-        if key in ['start','end']:
-            value=periods[0 if key=='start' else 1]
+        if not key.isdigit():
+            value=slots.get(key)
             if not value:raise QueryBlocked('No date is available for that placeholder')
             return value
         i=int(key)
@@ -268,7 +280,7 @@ def bind_claim_values(results,claim,periods):
             if style=='percent':return f'{value:,.2f}%'
             return f'{value:,.2f}'.rstrip('0').rstrip('.')
         return str(value)
-    rendered=re.sub(r'\[\[(\d+|start|end)\]\]',replace,text)
+    rendered=re.sub(slot_pattern,replace,text)
     if '[[' in rendered:raise QueryBlocked('Malformed evidence placeholder')
     return rendered
 
