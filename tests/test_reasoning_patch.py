@@ -297,3 +297,19 @@ def test_staff_display_uses_exact_module_values_and_matched_baseline(db):
     assert 'AUD 1,380.00' in text and 'AUD 2,698.75' in text and '-48.87%' in text
     assert '18 completed service hours' in text and '22 bookable hours' in text
     assert 'AUD -1,318.75' in text and '81.82%' in text
+
+
+def test_staff_narration_uses_complete_prose_not_value_parts():
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+    from pydantic import ValidationError
+    from analyst_ai import structured
+    wire=dict(claims=[dict(text='Completed service hours decreased.',evidence=[dict(result=0,row=0,column='completed_service_hours')],context_ids=[])],
+        investigation='',recommendation='',measurement='',missing_information='',chart=dict(kind='none',result=0,x='',y=''),context_review=[])
+    client=MagicMock();client.responses.parse.side_effect=lambda **kw:SimpleNamespace(output_parsed=kw['text_format'].model_validate(wire))
+    answer=structured(client,'gpt-4.1-mini',Answer,'obsolete placeholder instructions',dict(plan=dict(diagnostic=dict(start_date='2026-09-07',end_date='2026-09-13')),results=[dict(rows=[dict(completed_service_hours=18)])]))
+    assert answer.claims[0].text=='Completed service hours decreased.'
+    schema=client.responses.parse.call_args.kwargs['text_format']
+    assert 'obsolete placeholder instructions' not in client.responses.parse.call_args.kwargs['instructions']
+    invalid=deepcopy(wire);invalid['claims'][0]['text']='Hours decreased by [[0]].'
+    with pytest.raises(ValidationError):schema.model_validate(invalid)
