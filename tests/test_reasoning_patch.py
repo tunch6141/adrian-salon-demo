@@ -315,3 +315,12 @@ def test_staff_narration_uses_complete_prose_not_value_parts():
     assert 'obsolete placeholder instructions' not in client.responses.parse.call_args.kwargs['instructions']
     invalid=deepcopy(wire);invalid['claims'][0]['text']='Hours decreased by [[0]].'
     with pytest.raises(ValidationError):schema.model_validate(invalid)
+
+
+def test_fallback_booking_count_respects_service_row_grain(db):
+    sql="SELECT booking_source,COUNT(*) AS completed_bookings FROM completed_services WHERE visit_date BETWEEN '2026-08-01' AND '2026-08-31' GROUP BY booking_source"
+    with pytest.raises(QueryBlocked,match='one row per service'):db.query(sql)
+    rows=db.query(sql.replace('COUNT(*)','COUNT(DISTINCT booking_id)'))['rows']
+    assert {r['booking_source']:r['completed_bookings'] for r in rows}=={'phone':98,'online':82,'walk_in':81}
+    with pytest.raises(QueryBlocked,match='numeric symbols'):
+        bind_claim_values([],dict(text='In August '+chr(0x10142)+'start'+chr(0x10143),evidence=[],context_ids=[]),['2026-08-01','2026-08-31'])

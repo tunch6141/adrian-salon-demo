@@ -6,7 +6,7 @@ from typing import Literal,Union
 from pydantic import BaseModel, Field
 from analyst_engine import RULES, QueryBlocked, reference_value, validate_chart, service_diagnostic, bind_claim_values, period_diagnostic
 
-ANSWER_RELEASE = '20 Sep 2026 · reasoning 19'
+ANSWER_RELEASE = '20 Sep 2026 · reasoning 20'
 
 class ContextDraft(BaseModel):
     entity: str
@@ -252,6 +252,9 @@ def structured(client,model,schema,instructions,payload):
     extra={'reasoning':{'effort':'low'}} if model.startswith('gpt-5.6') else {}
     requested_schema=schema
     if schema in (Answer,Review):
+        # The wire protocol below owns value formatting. Legacy slot examples
+        # conflict with direct parts and caused invented placeholder glyphs.
+        instructions='\n'.join(line for line in instructions.splitlines() if not any(token in line.lower() for token in ['placeholder','[[',' slot']))
         # Restrict context citations to notes actually retrieved for this turn.
         # With no matching notes, the model can only emit an empty list.
         from pydantic import create_model

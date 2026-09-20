@@ -134,6 +134,12 @@ class Database:
             raise QueryBlocked('Joins, nested queries and CTEs are disabled in this pilot.')
         if any(tree.find_all(exp.Window)):
             raise QueryBlocked('Window calculations are not approved in this pilot.')
+        if tables[0].name=='completed_services':
+            for projection in tree.expressions:
+                if any(word in projection.alias_or_name.lower() for word in ['booking','appointment']):
+                    for count in projection.find_all(exp.Count):
+                        if not isinstance(count.this,exp.Distinct) or {c.name for c in count.find_all(exp.Column)}!={'booking_id'}:
+                            raise QueryBlocked('completed_services has one row per service, not per booking. Count DISTINCT booking_id for booking/appointment counts, or use booking_records at one row per booking.')
         # A SELECT must derive values from real columns, never just invent a constant result.
         for projection in tree.expressions:
             if not list(projection.find_all(exp.Column)) and not projection.find(exp.Count) and not isinstance(projection,exp.Star):
@@ -260,6 +266,9 @@ def bind_claim_values(results,claim,periods,contexts=()):
     import re
     refs=claim['evidence']
     text=claim['text']
+    import unicodedata
+    if any(ord(c)>127 and unicodedata.category(c) in ['Nl','No'] for c in text):
+        raise QueryBlocked('Remove invented numeric symbols or placeholder glyphs; use the structured period/value parts for values.')
     if '\ufffc' in text or '\ufffd' in text or '{{' in text or '}}' in text:
         raise QueryBlocked('Unrenderable placeholder in the answer. Use the documented [[0]] or context date placeholders, not replacement characters.')
     columns={ref['column'] for ref in refs}
