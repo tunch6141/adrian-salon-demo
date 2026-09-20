@@ -6,7 +6,7 @@ from .calculations import (financial_lines,completed_services,capacity_rows,stoc
     quote_queue,receivables,future_workload,customer_returns,capability_rows,enabled,staff_return_outcomes,booking_outcomes,pricing_simulation)
 from .costing import allocate_costs
 
-VIEW_MODULES={'staff_return_outcomes':'customers','booking_outcomes':'bookings','pricing_simulations':'pricing','customer_concentration':'customers','financial_lines':'revenue','completed_services':'staff_capacity','capacity_daily':'staff_capacity',
+VIEW_MODULES={'booking_records':'bookings','customer_records':'customers','staff_return_outcomes':'customers','booking_outcomes':'bookings','pricing_simulations':'pricing','customer_concentration':'customers','financial_lines':'revenue','completed_services':'staff_capacity','capacity_daily':'staff_capacity',
  'staff_daily':'staff_capacity','inventory_coverage':'inventory','landed_receipts':'suppliers','sale_cost_allocations':'gross_margin',
  'quote_followup_queue':'quotes','receivables':'receivables','future_workload':'bookings','customer_returns':'customers',
  'customer_value':'customers','service_sales':'services','attachment_pairs':'services','quote_conversion':'quotes'}
@@ -69,6 +69,14 @@ def build_views(intake):
     rows['quote_conversion']=[{'followed_up':int(flag),'issued_quotes':len(group),'won_quotes':sum(q['status']=='Won' for q in group),
         'open_quotes':sum(q['status']=='Open' for q in group),'won_share_of_issued_pct':sum(q['status']=='Won' for q in group)/len(group)*100,
         'interpretation_limit':'Descriptive issued-quote cohort, open outcomes immature. Follow-up association is not causal.'} for flag,group in qgroups.items()]
+    # These are saved CLEANED records, at one row per primary key. Enrichment is
+    # deterministic and many-to-one; it cannot multiply financial line values.
+    staff_names={r['staff_id']:r['staff_name'] for r in intake.tables.get('staff',[])}
+    customers={r['customer_id']:r for r in intake.tables.get('customers',[])}
+    rows['booking_records']=[{**r,'staff_name':staff_names.get(r.get('staff_id')),
+        'customer_name':customers.get(r.get('customer_id'),{}).get('customer_name')}
+        for r in intake.tables.get('bookings',[])]
+    rows['customer_records']=[dict(r) for r in intake.tables.get('customers',[])]
     frames={}
     for name,records in rows.items():
         if name in VIEW_MODULES and not enabled(intake,VIEW_MODULES[name]):continue

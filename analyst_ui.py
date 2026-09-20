@@ -47,7 +47,7 @@ def render_result(item):
         else:
             for result in item['results'][:2]:
                 st.caption(result['table'])
-                st.dataframe(pd.DataFrame(result['rows']).head(10),hide_index=True)
+                st.dataframe(pd.DataFrame(result['rows']),hide_index=True)
     elif status=='context':
         st.info('I have prepared an owner-context draft. Review the dates and explanation below before saving.')
     elif status in ['unsupported','clarify']:
@@ -60,6 +60,13 @@ def render_result(item):
         a=item['answer']
         for claim in a['claims']:
             safe_text(claim['text'])
+        if item['plan'].get('booking_id') or item['plan'].get('trend') or (item['plan'].get('queries') and not item['plan'].get('diagnostic')):
+            for result in item['results']:
+                if result['table']=='approved_trend_totals':continue
+                frame=pd.DataFrame(result['rows'])
+                if 'appointment_start' in frame and 'appointment_end' in frame:
+                    cols=list(frame.columns);cols.remove('appointment_end');cols.insert(cols.index('appointment_start')+1,'appointment_end');frame=frame[cols]
+                st.dataframe(frame,hide_index=True,use_container_width=True)
         if item['plan'].get('diagnostic') and len(item['plan']['diagnostic']['staff'])>1 and item['results']:
             summary=pd.DataFrame(item['results'][0]['rows'])
             if 'staff_name' in summary:
@@ -78,7 +85,7 @@ def render_result(item):
     if item.get('timing'):
         timing=item['timing']
         st.caption(f"Completed in {timing['total_seconds']:.1f}s · {len(timing['calls'])} AI calls")
-    if item['results'] or item.get('issues'):
+    if item['results'] or item.get('issues') or item.get('contexts'):
         with st.expander('Evidence and calculations'):
             st.caption(item['plan']['scope'])
             if item.get('dataset_version'):st.caption('Cleaned data version: '+item['dataset_version'])
@@ -90,6 +97,7 @@ def render_result(item):
                 st.write('Relevant owner-reported context — not independently verified:')
                 st.dataframe(pd.DataFrame(item['contexts']),hide_index=True)
             if item.get('issues'):st.write(item['issues'])
+            if item.get('execution_notes'):st.write(item['execution_notes'])
             if item.get('timing'):st.write(item['timing']['calls'])
 
 
@@ -137,7 +145,7 @@ def context_form(store):
 
 def render(t,setting):
     st.subheader('Ask your salon')
-    st.caption('Version 6 · Saved cleaned data and approval history')
+    st.caption('Version 7 · Cleaned-data answers and commercial diagnostics')
     key,model,password=setting('OPENAI_API_KEY'),setting('OPENAI_MODEL'),setting('DEMO_PASSWORD')
     if not (key and model and password):
         st.info('Add OPENAI_API_KEY, OPENAI_MODEL and DEMO_PASSWORD in Streamlit Secrets.');return
@@ -183,7 +191,10 @@ def render(t,setting):
         try:
             with st.status('Investigating your question…',expanded=True) as progress:
                 db=Database.from_intake(t) if hasattr(t,'tables') else Database(t)
-                history=[{'question':x['question'],'plan':x['result']['plan'],'answer':x['result']['answer'],'status':x['result']['status']} for x in turns[-5:]]
+                history=[{'question':x['question'],'plan':x['result']['plan'],'answer':x['result']['answer'],'status':x['result']['status'],
+                    'issues':x['result'].get('issues',[]),'execution_notes':x['result'].get('execution_notes',[]),
+                    'retrieved_scopes':[{'table':r['table'],'sql':r['sql']} for r in x['result']['results']]}
+                    for x in turns[-5:]]
                 # History is only interpretation context; each answer retrieves fresh database evidence.
                 result=investigate(OpenAI(api_key=key,timeout=60,max_retries=0),model,db,question.strip(),history,store,on_stage=lambda stage: progress.update(label=stage))
                 result['dataset_version']=getattr(t,'version_id',t.revision)

@@ -108,7 +108,7 @@ class Database:
             raise QueryBlocked('Window calculations are not approved in this pilot.')
         # A SELECT must derive values from real columns, never just invent a constant result.
         for projection in tree.expressions:
-            if not list(projection.find_all(exp.Column)) and not projection.find(exp.Count):
+            if not list(projection.find_all(exp.Column)) and not projection.find(exp.Count) and not isinstance(projection,exp.Star):
                 raise QueryBlocked('Each result must derive from database columns.')
         if hasattr(self,'intake') and tables[0].name=='financial_lines':
             for comparison in tree.find_all(exp.EQ):
@@ -260,6 +260,26 @@ def bind_claim_values(results,claim,periods,contexts=()):
             text=re.sub(pattern,f'[[{first}]] to [[{last}]]',text)
         # The end date may already have been canonicalised above.
         text=re.sub(rf'(?<![\w.]){a.day}\s*(?:to|–|-)\s*\[\[{last}\]\]',f'[[{first}]] to [[{last}]]',text)
+    # A literal copied exactly from its cited cell is just another spelling of
+    # the same slot, not a new model calculation. Semantic review still checks
+    # that the chosen cell supports the meaning. Never search uncited cells.
+    for i,ref in enumerate(refs):
+        value=reference_value(results,ref)
+        if value is None:continue
+        candidates=[]
+        style=ref.get('format','plain')
+        if isinstance(value,(int,float)):
+            display=f'{value:,.2f}'
+            candidates=[str(value),display,display.rstrip('0').rstrip('.')]
+            if style=='money':candidates=['AUD '+v for v in candidates]+['$'+display]
+            elif style=='percent':candidates=[v+'%' for v in candidates]
+        elif isinstance(value,str) and re.search(r'\d',value):candidates=[value]
+        for candidate in sorted(set(candidates),key=len,reverse=True):
+            # Do not replace the digits inside an already authored placeholder.
+            chunks=re.split(r'(\[\[.*?\]\])',text)
+            for n in range(0,len(chunks),2):
+                chunks[n]=re.sub(r'(?<![\w.,])'+re.escape(candidate)+r'(?!\w|[.,]\d)',f'[[{i}]]',chunks[n])
+            text=''.join(chunks)
     slot_pattern=r'\[\[(\d+|start|end|context\d+_(?:start|end))\]\]'
     without_slots=re.sub(slot_pattern,'',text)
     if re.search(r'\d',without_slots):
