@@ -180,9 +180,10 @@ def test_method_followup_uses_previous_scope_without_inventing_comparison(db):
     prior=Plan(intent='analysis',**base,diagnostic=Diagnostic(staff=['Sarah'],start_date='2026-09-17',end_date='2026-09-17'))
     p=Plan(intent='method',**base)
     a=Answer(claims=[dict(text='The prior calculation did not use a weekly comparison.',evidence=[dict(result=0,row=0,column='comparison_used')],context_ids=[])],investigation='',recommendation='',measurement='',missing_information='',chart=dict(kind='none',result=0,x='',y=''))
-    history=[dict(question="How's Sarah on September seventeenth?",plan=prior.model_dump(),answer=None,status='facts_only')]
-    with patch('analyst_ai.structured',side_effect=[p,a,Review(approved=True,issues=[])]):
+    history=[dict(question="How's Sarah on September seventeenth?",plan=prior.model_dump(),answer={'claims':[{'text':'Previous mistaken narrative'}]},status='facts_only')]
+    with patch('analyst_ai.structured',side_effect=[p,a,Review(approved=True,issues=[])]) as calls:
         result=investigate(None,'gpt-4.1-mini',db,'Are you comparing his day with weekly revenue?',history,ContextStore())
+    assert 'answer' not in calls.call_args.args[-1]['recent_conversation'][0]
     assert result['status']=='answered'
     scope=result['results'][0]['rows'][0]
     assert scope['current_days']==1 and scope['comparison_used'] is False

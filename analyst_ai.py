@@ -6,7 +6,7 @@ from typing import Literal,Union
 from pydantic import BaseModel, Field
 from analyst_engine import RULES, QueryBlocked, reference_value, validate_chart, service_diagnostic, bind_claim_values, period_diagnostic
 
-ANSWER_RELEASE = '20 Sep 2026 · reasoning 16'
+ANSWER_RELEASE = '20 Sep 2026 · reasoning 17'
 
 class ContextDraft(BaseModel):
     entity: str
@@ -366,7 +366,10 @@ def _investigate(client,model,db,question,history,context_store,stage):
         return {'plan':history[-1]['plan'],'answer':None,'results':[],'contexts':[],'status':'explanation'}
     rules=getattr(db,'rules',RULES)
     from analytics.reasoning import catalogue,GUIDANCE
-    planning={'question':question,'recent_conversation':history[-6:],'schema':db.schema,'reasoning_graph':catalogue(db.schema)}
+    # Remember the owner's questions and executed scopes. Previous model prose
+    # is not evidence and can carry a mistaken phrase into every later answer.
+    conversation=[{k:h[k] for k in ['question','plan','status','retrieved_scopes','execution_notes'] if k in h} for h in history[-6:]]
+    planning={'question':question,'recent_conversation':conversation,'schema':db.schema,'reasoning_graph':catalogue(db.schema)}
     planner_rules=ROUTING_RULES+'\n'+rules+'''\nCURRENT QUESTION TAKES PRIORITY. A new explicit person or period REPLACES the previous scope. Never carry a second staff member into a question naming only one. Use history only to resolve omitted information or a genuine follow-up, not to expand an explicit request.
 Return a precise scope and only the requested module, leaving unused modules null. For a show/list/plot revenue trend, use trend with explain=false and no SQL. For a why/advice trend, explain=true. Use lookup for factual displays, analysis for interpretation, method for explaining the previous calculation. Context read uses lookup; context write creates an owner-reviewed draft, never saves automatically.
 For a question outside the modules, compose SQLite SELECTs against the supplied schema. One table per query, no joins/subqueries/CTEs/windows. No invented constants, max four queries and at most five hundred returned rows. Calculations and differences belong in SQL, never mental arithmetic. A why question should investigate measured contributors, even when motives are unknown. Unsupported means necessary evidence is absent, not that no preset module exists.
