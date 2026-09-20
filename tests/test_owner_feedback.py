@@ -33,6 +33,17 @@ def test_name_correction_keeps_other_comparison_participant():
     assert p.diagnostic.staff==['Matthew','Sarah']
 
 
+def test_plural_chart_followup_retains_staff_and_change_needs_difference():
+    from analyst_ai import TrendRequest,preserve_followup_scope
+    from analyst_engine import bind_claim_values,QueryBlocked
+    p=plan(trend=TrendRequest(staff=[],start_date='2026-05-01',end_date='2026-08-31',grain='month',category='service'))
+    old=plan(diagnostic=Diagnostic(staff=['Sarah','Matthew'],start_date='2026-09-01',end_date='2026-09-15'))
+    preserve_followup_scope(p,'Show their monthly service revenue as a chart',[{'plan':old.model_dump()}],[{'staff_name':'Sarah'},{'staff_name':'Matthew'}])
+    assert p.trend.staff==['Sarah','Matthew']
+    with pytest.raises(QueryBlocked,match='calculated difference'):
+        bind_claim_values([{'rows':[{'net_revenue_aud':100}]}],dict(text='Revenue rose by [[0]].',evidence=[dict(result=0,row=0,column='net_revenue_aud',format='money')]),['',''])
+
+
 def test_chart_survives_withheld_narration_and_numeric_table_rounds():
     item={'status':'facts_only','answer':None,'results':[{'table':'approved_revenue_trend','rows':[
         {'period_start':'2026-05-01','staff_name':'Sarah','net_revenue_aud':420},

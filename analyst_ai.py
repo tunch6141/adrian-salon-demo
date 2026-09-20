@@ -6,7 +6,7 @@ from typing import Literal,Union
 from pydantic import BaseModel, Field
 from analyst_engine import RULES, QueryBlocked, reference_value, validate_chart, service_diagnostic, bind_claim_values, period_diagnostic
 
-ANSWER_RELEASE = '20 Sep 2026 · reasoning 22.1'
+ANSWER_RELEASE = '20 Sep 2026 · reasoning 22.2'
 
 class CustomerRequest(BaseModel):
     identifier: str = Field(description='Exact cleaned customer ID or name; resolve omitted identity from the previous booking result')
@@ -264,6 +264,24 @@ def preserve_name_correction(plan,question,history,staff_rows):
             return
 
 
+def preserve_followup_scope(plan,question,history,staff_rows):
+    """An unresolved plural reference cannot silently become the whole salon."""
+    import re
+    scope=plan.trend or plan.revenue or plan.diagnostic
+    if not scope or scope.staff:return
+    if not re.search(r'\b(their|them|those|both)\b',question,re.I):return
+    if re.search(r'\b(whole|entire|salon|business|all staff|everyone)\b',question,re.I):return
+    if any(re.search(r'\b'+re.escape(r['staff_name'])+r'\b',question,re.I) for r in staff_rows):return
+    for turn in reversed(history):
+        prior=turn.get('plan',{})
+        old=prior.get('trend') or prior.get('revenue') or prior.get('diagnostic')
+        if old and old.get('staff'):
+            scope.staff=list(old['staff'])
+            plan.context_entity=', '.join(scope.staff)
+            plan.scope=plan.context_entity+': '+scope.start_date+' to '+scope.end_date
+            return
+
+
 def narration_evidence(results,plan):
     """Expose matched comparison values to narration; retain raw totals in audit."""
     d=plan.diagnostic
@@ -426,6 +444,7 @@ For a context contribution, prepare draft with stated entity/dates/event_type/ex
     if hasattr(db,'intake'):
         preserve_explicit_staff_scope(plan,question,db.intake.tables.get('staff',[]))
         preserve_name_correction(plan,question,history,db.intake.tables.get('staff',[]))
+        preserve_followup_scope(plan,question,history,db.intake.tables.get('staff',[]))
         scope=plan.trend or plan.revenue or plan.diagnostic
         known={r['staff_name'] for r in db.intake.tables.get('staff',[])}
         unknown=[name for name in scope.staff if name not in known] if scope else []

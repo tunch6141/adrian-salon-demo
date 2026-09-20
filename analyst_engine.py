@@ -273,6 +273,9 @@ def bind_claim_values(results,claim,periods,contexts=()):
     if '\ufffc' in text or '\ufffd' in text or '{{' in text or '}}' in text:
         raise QueryBlocked('Unrenderable placeholder in the answer. Use the documented [[0]] or context date placeholders, not replacement characters.')
     columns={ref['column'] for ref in refs}
+    if re.search(r'\b(?:increas\w*|decreas\w*|ris\w*|rose|grew|grow\w*|fell|fall\w*|declin\w*)\s+by\b',text,re.I):
+        if not any(any(token in col.lower() for token in ['difference','change','minus','delta']) for col in columns):
+            raise QueryBlocked('An increase/decrease BY an amount must cite a calculated difference or change, not an ending value. Use rose TO for the ending value or cite the actual difference.')
     if re.search(r'\b(rose steadily|grew steadily|increased steadily|steadily rose|steadily grew|steadily increased|steady growth|consistent growth)\b',text,re.I):
         if any(row.get('complete_bucket_pattern')=='fluctuating' for r in results if r.get('table')=='approved_trend_totals' for row in r['rows']):
             raise QueryBlocked('The complete periods fluctuate. Describe the overall first-to-last movement without claiming steady or consistent growth.')
