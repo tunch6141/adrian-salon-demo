@@ -10,7 +10,15 @@ from analyst_ai import investigate, ANSWER_RELEASE
 from business_context import ContextStore
 
 
-def safe_text(text):st.markdown(text.replace('$',r'\$'))
+def numerical_prose(text):
+    """Display simple prose counts as digits, including quoted leave durations."""
+    import re
+    words='zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen'.split()
+    pattern=r'\b('+ '|'.join(words)+r')(?=\s+(?:days?|weeks?|months?|hours?|appointments?|bookings?|visits?|percent|per cent)\b)'
+    return re.sub(pattern,lambda m:str(words.index(m[0].lower())),text,flags=re.I)
+
+
+def safe_text(text):st.markdown(numerical_prose(text).replace('$',r'\$'))
 
 
 def display_frame(rows):

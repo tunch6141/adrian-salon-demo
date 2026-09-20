@@ -6,7 +6,7 @@ from typing import Literal,Union
 from pydantic import BaseModel, Field
 from analyst_engine import RULES, QueryBlocked, reference_value, validate_chart, service_diagnostic, bind_claim_values, period_diagnostic
 
-ANSWER_RELEASE = '20 Sep 2026 · reasoning 22'
+ANSWER_RELEASE = '20 Sep 2026 · reasoning 22.1'
 
 class CustomerRequest(BaseModel):
     identifier: str = Field(description='Exact cleaned customer ID or name; resolve omitted identity from the previous booking result')
@@ -118,6 +118,7 @@ OUTPUT NUMBERS THROUGH PLACEHOLDERS ONLY. In claim.text use [[0]], [[1]] etc ref
 Each slot inserts the WHOLE value: [[start]] already includes day, month and year; an ID/name slot already includes all its letters and digits. Do not prefix an extra ID letter, repeat month/day words around an ISO date, redact part of a name, or invent substitute symbols. Example: 'Sarah recorded [[0]] on [[start]].' The application will fill these slots; write the actual slot syntax.
 NEVER mentally sum table rows. Use the supplied calculated summary/difference cells, or request a correction to the queries. Every quantitative fact in a claim must be a placeholder bound to an appropriate cited cell. Use completed service hours, NOT hours worked/attendance.
 bookable_hours means available capacity: say 'bookable hours', never 'booked hours'. Completed service hours are completed work, while future booked hours are scheduled work; keep these distinct.
+Never say someone worked bookable hours: these are available capacity, not attendance. revenue_per_service_hour is NET service revenue per completed service hour, never gross revenue or a total. Attribute every leave statement explicitly to the owner's recorded note; do not claim leave was included in or subtracted from capacity unless the source calculation proves it.
 Do not grade an isolated utilisation percentage as efficient, poor or good without a recorded target or a fair comparison. Say what it measures. Unqueried cost/profit is not missing data: use 'profit was not calculated here' unless actual returned coverage proves unavailable costs.
 For a claim citing owner context, [[context0_start]] and [[context0_end]] insert the dates of the first ID in that claim's context_ids list; context1 refers to its second ID. Use these for note dates that differ from the analysis period. Describe note content as owner-reported, never as an independently verified cause. Avoid quoting numeric amounts from free-text notes as calculated facts.
 For period comparisons use approved_comparison_summary: each column names its metric explicitly, including matched baseline, difference and percentage change. Use absolute_difference or absolute_percentage_change when saying fell by or rose by; signed differences are for change labels. Do not recalculate existing comparisons or request redundant raw rows. When approved_service_mix_comparison is supplied, use its baseline_average_revenue_aud and difference_aud: raw prior multi-week mix totals are not a weekly baseline. Discuss relevant owner-reported leave/closure notes before suggesting operational changes. Temporary leave plus stable utilisation does not establish persistent spare capacity or justify lasting roster cuts. Inspect service mix, compatible future capacity and covered profit before recommending discounts; never assume a revenue decline establishes weak demand. A measured service-category revenue difference is a valid financial explanation, not proof of customer or employee motivation. If the premise is false, correct it first. Compare all relevant categories; do not cherry-pick colouring when highlights offset it.
@@ -352,6 +353,10 @@ def validate_commercial_labels(db,plan,answer,results,contexts=()):
         raise QueryBlocked('The context assessment references a note that was not retrieved.')
     if '\ufffc' in prose or '\ufffd' in prose:
         raise QueryBlocked('Remove replacement characters. Use evidence placeholders for dates and values, or omit them from optional sections.')
+    if re.search(r'\bworked\b[^.!?\n]{0,80}\bbookable hours\b',prose,re.I):
+        raise QueryBlocked('Bookable hours are available capacity, not hours worked. Say had available bookable hours; attendance was not measured.')
+    if re.search(r'\bgross service revenue\b',prose,re.I) and any(ref.column=='revenue_per_service_hour' for c in answer.claims for ref in c.evidence):
+        raise QueryBlocked('The hourly metric is net service revenue per completed service hour, not gross service revenue. Correct its label.')
     if not any(r.get('table')=='approved_period_comparison' for r in results):
         if re.search(r'\b(reasonably efficient|efficient use of|good utilisation|poor utilisation)\b',prose,re.I):
             raise QueryBlocked('An isolated utilisation percentage has no established efficiency benchmark. State the measured utilisation without grading it as good, poor or efficient.')

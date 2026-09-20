@@ -41,6 +41,15 @@ def test_chart_survives_withheld_narration_and_numeric_table_rounds():
     assert display_frame([{'name':'Sarah','utilisation':82.352941}]).iloc[0]['utilisation']=='82.35'
 
 
+def test_leave_counts_and_capacity_labels():
+    from analyst_ui import numerical_prose
+    from analyst_ai import Answer,validate_commercial_labels
+    from analyst_engine import QueryBlocked
+    assert numerical_prose('Sarah had two days of leave; Matthew had one day.')=='Sarah had 2 days of leave; Matthew had 1 day.'
+    answer=Answer(claims=[dict(text='Matthew worked [[0]] bookable hours.',evidence=[],context_ids=[])],investigation='',recommendation='',measurement='',missing_information='',chart=dict(kind='none',result=0,x='',y=''))
+    with pytest.raises(QueryBlocked,match='available capacity'):validate_commercial_labels(None,plan(),answer,[],[])
+
+
 def test_source_context_correction_retraction_and_history_preserve_raw():
     intake=load_snapshot();original=deepcopy(intake.contexts)
     backing=ContextStore();store=CombinedContextStore(intake,backing)
