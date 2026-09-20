@@ -6,7 +6,7 @@ from typing import Literal,Union
 from pydantic import BaseModel, Field
 from analyst_engine import RULES, QueryBlocked, reference_value, validate_chart, service_diagnostic, bind_claim_values, period_diagnostic
 
-ANSWER_RELEASE = '20 Sep 2026 · reasoning 8'
+ANSWER_RELEASE = '20 Sep 2026 · reasoning 9'
 
 class ContextDraft(BaseModel):
     entity: str
@@ -158,6 +158,59 @@ def decode_answer_parts(wire):
     return Answer(**{**data,'claims':claims})
 
 
+def canonical_trend_request(queries):
+    """Promote equivalent model-written revenue SQL to the calendar module.
+
+    Inspect the SQL meaning, not words in the owner's question. Extra filters,
+    metrics or grouping dimensions retain the general read-only fallback.
+    """
+    import sqlglot
+    from sqlglot import exp
+    from analyst_engine import query_period
+    if len(queries)!=1:return None
+    try:tree=sqlglot.parse_one(queries[0],read='sqlite')
+    except Exception:return None
+    if not isinstance(tree,exp.Select) or tree.args.get('having'):return None
+    if [t.name for t in tree.find_all(exp.Table)]!=['financial_lines']:return None
+    sums=list(tree.find_all(exp.AggFunc))
+    if len(sums)!=1 or not isinstance(sums[0],exp.Sum) or not isinstance(sums[0].this,exp.Column) or sums[0].this.name!='net_revenue':return None
+    for selection in tree.expressions:
+        value=selection.this if isinstance(selection,exp.Alias) else selection
+        if not isinstance(value,(exp.Sum,exp.TimeToStr)) and not (isinstance(value,exp.Column) and value.name=='staff_name'):return None
+    columns={c.name for c in tree.find_all(exp.Column)}
+    aliases={a.alias for a in tree.find_all(exp.Alias)}
+    if columns-{'net_revenue','staff_name','item_type','posted_date'}-aliases:return None
+    group=tree.args.get('group')
+    if not group:return None
+    formats=[n.this for n in tree.find_all(exp.Literal) if n.is_string and '%' in n.this]
+    if len(formats)!=1:return None
+    fmt=formats[0]
+    grain='week' if fmt in ['%Y-%W','%Y-%U','%Y-%V'] else 'month' if fmt=='%Y-%m' else 'day' if fmt=='%Y-%m-%d' else None
+    if not grain:return None
+    period=query_period([dict(sql=queries[0])])
+    if not period:return None
+    where=tree.args.get('where')
+    if not where or any(where.find_all(exp.Or,exp.Not)):return None
+    if {c.name for c in where.find_all(exp.Column)}-{'staff_name','item_type','posted_date'}:return None
+    staff=[];category='all';seen=set()
+    for node in where.find_all(exp.EQ,exp.In):
+        if not isinstance(node.this,exp.Column):return None
+        name=node.this.name
+        if name not in ['staff_name','item_type'] or name in seen:return None
+        seen.add(name)
+        values=node.expressions if isinstance(node,exp.In) else [node.expression]
+        if not all(isinstance(v,exp.Literal) and v.is_string for v in values):return None
+        if name=='staff_name':staff=[v.this for v in values]
+        elif name=='item_type':
+            if len(values)!=1 or values[0].this not in ['service','product','part']:return None
+            category=values[0].this
+    # Only ordinary bounds and equality/IN predicates are equivalent here.
+    for node in where.walk():
+        if isinstance(node,(exp.Like,exp.NEQ,exp.Is)) or (isinstance(node,exp.Func) and not isinstance(node,exp.And)):return None
+        if isinstance(node,(exp.GT,exp.GTE,exp.LT,exp.LTE,exp.Between)) and not (isinstance(node.this,exp.Column) and node.this.name=='posted_date'):return None
+    return TrendRequest(staff=staff,start_date=period[0],end_date=period[1],grain=grain,category=category)
+
+
 def structured(client,model,schema,instructions,payload):
     import time
     from contextvars import ContextVar
@@ -255,6 +308,8 @@ def _investigate(client,model,db,question,history,context_store,stage):
         plan=structured(client,model,Plan,planner_rules+'\nBefore asking a follow-up clarification, check whether this is a question ABOUT the previous answer or calculation. If so use method; do not demand a new comparison period. If genuinely new and underspecified, keep clarify.',{**planning,'proposed_plan':plan.model_dump()})
     if plan.intent in ['unsupported','clarify','context']:
         return {'plan':plan.model_dump(),'answer':None,'results':[],'contexts':[], 'status':plan.intent}
+    if hasattr(db,'intake') and plan.queries and not (plan.trend or plan.booking_id or plan.diagnostic or plan.revenue):
+        plan.trend=canonical_trend_request(plan.queries)
     # A module owns its core retrieval. In particular a shortened ID must not be
     # queried again literally after the unique canonical ID has been resolved.
     if plan.booking_id:

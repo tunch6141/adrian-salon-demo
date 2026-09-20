@@ -218,3 +218,14 @@ def test_uncited_aside_does_not_suppress_supported_core_answer(db):
     assert result['status']=='answered'
     assert [c['text'] for c in result['answer']['claims']]==['Revenue was AUD 420.00.']
     assert len(calls.call_args.args[-1]['rendered_answer']['claims'])==1
+
+
+def test_equivalent_revenue_sql_uses_calendar_module_without_changing_fallback():
+    from analyst_ai import canonical_trend_request
+    q="SELECT staff_name,strftime('%Y-%W',posted_date) AS year_week,SUM(net_revenue) AS revenue FROM financial_lines WHERE staff_name='Sarah' AND item_type='service' AND posted_date >= '2026-05-01' AND posted_date <= '2026-08-31' GROUP BY staff_name,year_week ORDER BY year_week LIMIT 10"
+    trend=canonical_trend_request([q])
+    assert trend.staff==['Sarah'] and trend.grain=='week' and trend.category=='service'
+    assert (trend.start_date,trend.end_date)==('2026-05-01','2026-08-31')
+    for custom in [q.replace("staff_name='Sarah'","staff_name LIKE 'S%'"),q.replace('SUM(net_revenue)','SUM(net_revenue)*2'),
+        q.replace("item_type='service'","booking_source='phone'"),q.replace("AND item_type", "OR item_type")]:
+        assert canonical_trend_request([custom]) is None
