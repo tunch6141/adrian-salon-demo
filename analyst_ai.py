@@ -136,10 +136,31 @@ reasoning_family is one of the supplied graph keys or blank. Do not treat option
 '''
 
 
+def decode_answer_parts(wire):
+    """Compile direct value references into internal slots; the model never numbers them."""
+    data=wire.model_dump();claims=[]
+    for claim in data['claims']:
+        refs=list(claim['evidence']);ids=list(claim['context_ids']);text=[]
+        for part in claim['parts']:
+            if part['kind']=='text':text.append(part['text'])
+            elif part['kind']=='value':
+                ref=part['citation']
+                if ref not in refs:refs.append(ref)
+                text.append('[['+str(refs.index(ref))+']]')
+            elif part['kind']=='period':
+                text.append('[['+('start_year' if part['field']=='year' else part['field'])+']]')
+            elif part['kind']=='context_date':
+                if part['context_id'] not in ids:ids.append(part['context_id'])
+                text.append('[[context'+str(ids.index(part['context_id']))+'_'+('start' if part['field']=='start_date' else 'end')+']]')
+        claims.append(dict(text=''.join(text),evidence=refs,context_ids=ids))
+    return Answer(**{**data,'claims':claims})
+
+
 def structured(client,model,schema,instructions,payload):
     import time
     from contextvars import ContextVar
     extra={'reasoning':{'effort':'low'}} if model.startswith('gpt-5.6') else {}
+    requested_schema=schema
     if schema in (Answer,Review):
         # Restrict context citations to notes actually retrieved for this turn.
         # With no matching notes, the model can only emit an empty list.
@@ -155,19 +176,31 @@ def structured(client,model,schema,instructions,payload):
                 result=(Literal[i],...),row=(int,Field(ge=0,le=len(result['rows'])-1)),column=(Literal[columns],...)))
         citation_type=Union[tuple(citations)] if len(citations)>1 else citations[0] if citations else Citation
         evidence_field=Field(default_factory=list) if citations else Field(default_factory=list,max_length=0)
-        claim_type=create_model('EvidenceClaim',__base__=Claim,context_ids=(context_type,context_field),
-            evidence=(list[citation_type],evidence_field),
-            text=(str,Field(pattern=r'^(?:[^0-9\[\]{}\uFFFC\uFFFD]|\[\[(?:[0-9]+|start|end|context[0-9]+_(?:start|end))\]\])*$',
-                description='Write prose with all numeric facts, dates, years and IDs containing digits inserted through [[0]], [[1]], [[start]], [[end]] or cited context date placeholders. Never type literal digits.')))
+        text_part=create_model('TextPart',kind=(Literal['text'],...),text=(str,Field(pattern=r'^[^0-9\[\]{}\uFFFC\uFFFD]*$')))
+        parts=[text_part]
+        if citations:parts.append(create_model('ValuePart',kind=(Literal['value'],...),citation=(citation_type,...)))
+        p=payload.get('plan',{});scope=p.get('trend') or p.get('revenue') or p.get('diagnostic') or {}
+        start=scope.get('start_date') or p.get('context_start');end=scope.get('end_date') or p.get('context_end')
+        periods=tuple((['start','year'] if start else [])+(['end'] if end else []))
+        if periods:parts.append(create_model('PeriodPart',kind=(Literal['period'],...),field=(Literal[periods],...)))
+        if ids:parts.append(create_model('ContextDatePart',kind=(Literal['context_date'],...),context_id=(Literal[ids],...),field=(Literal['start_date','end_date'],...)))
+        part_type=Union[tuple(parts)] if len(parts)>1 else parts[0]
+        claim_type=create_model('EvidenceClaim',parts=(list[part_type],Field(min_length=1,max_length=40)),
+            context_ids=(context_type,context_field),evidence=(list[citation_type],evidence_field))
         answer_type=create_model('Answer',__base__=Answer,claims=(list[claim_type],Field(max_length=4)))
         schema=answer_type if schema is Answer else create_model('Review',__base__=Review,revised_answer=(answer_type|None,None))
+        instructions+='''\nRESPONSE FORMAT OVERRIDE: The output schema uses claim.parts, not manually numbered placeholders. Build each sentence as a sequence of text parts and value parts. A value part contains its DIRECT citation (result, row, column, format); the application inserts that entire value. A period part inserts start/end ISO date or the analysis year. A context_date part inserts the date from the specified actual note. Never type [[0]] or other placeholders yourself. Example parts: text "Phone accounted for ", value citation to completed_booking_count, text " completed bookings." For "In August [year]", use text "In August ", period field year, text ", ...". Include ordinary spaces in text parts. Additional evidence citations support qualitative statements; do not display a cell unrelated to its sentence. Do not prefix letters/month words already contained in an inserted value. When reviewing a rendered answer, any revised_answer must use this same parts format. All earlier evidence and commercial rules still apply; this override only changes how sentences link to their source values.'''
     started=time.monotonic()
     response=client.responses.parse(model=model,instructions=instructions,input=json.dumps(payload,default=str),text_format=schema,max_output_tokens=3000,store=False,**extra)
     stats=ACTIVE_STATS.get()
     if stats is not None:
         stats.append({'stage':schema.__name__,'seconds':round(time.monotonic()-started,2)})
     if response.output_parsed is None:raise QueryBlocked('AI did not return a complete validated response. Try a narrower question.')
-    return response.output_parsed
+    parsed=response.output_parsed
+    if requested_schema is Answer:return decode_answer_parts(parsed)
+    if requested_schema is Review:
+        return Review(approved=parsed.approved,issues=parsed.issues,revised_answer=decode_answer_parts(parsed.revised_answer) if parsed.revised_answer else None)
+    return parsed
 
 from contextvars import ContextVar
 ACTIVE_STATS=ContextVar('analyst_stage_timings',default=None)

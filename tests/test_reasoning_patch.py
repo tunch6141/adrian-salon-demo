@@ -126,10 +126,15 @@ def test_live_output_schema_cannot_invent_context_references():
     from unittest.mock import MagicMock
     from pydantic import ValidationError
     from analyst_ai import structured
+    from types import SimpleNamespace
     client=MagicMock()
-    sample=dict(claims=[dict(text='Revenue [[0]].',evidence=[dict(result=0,row=0,column='amount')],context_ids=[])],investigation='',recommendation='',measurement='',missing_information='',chart=dict(kind='none',result=0,x='',y=''))
+    ref=dict(result=0,row=0,column='amount',format='money')
+    sample=dict(claims=[dict(parts=[dict(kind='text',text='Revenue '),dict(kind='value',citation=ref),dict(kind='text',text='.')],evidence=[ref],context_ids=[])],investigation='',recommendation='',measurement='',missing_information='',chart=dict(kind='none',result=0,x='',y=''))
+    client.responses.parse.side_effect=lambda **kw:SimpleNamespace(output_parsed=kw['text_format'].model_validate(sample))
     for contexts in [[],[dict(id='CTX1')]]:
-        structured(client,'gpt-4.1-mini',Answer,'test',{'contexts':contexts,'results':[{'rows':[{'amount':420}]}]})
+        answer=structured(client,'gpt-4.1-mini',Answer,'test',{'contexts':contexts,'results':[{'rows':[{'amount':420}]}]})
+        assert answer.claims[0].text=='Revenue [[0]].'
+        assert bind_claim_values([{'rows':[{'amount':420}]}],answer.claims[0].model_dump(),['',''])=='Revenue AUD 420.00.'
         schema=client.responses.parse.call_args.kwargs['text_format']
         schema.model_validate(sample)
         invalid=deepcopy(sample);invalid['claims'][0]['context_ids']=['invented']
@@ -138,10 +143,22 @@ def test_live_output_schema_cannot_invent_context_references():
             invalid=deepcopy(sample);invalid['claims'][0]['evidence'][0].update(change)
             with pytest.raises(ValidationError):schema.model_validate(invalid)
         for text in ['Revenue was about AUD 1,000.','On 17th Sep 2026.','Booking B0004.']:
-            invalid=deepcopy(sample);invalid['claims'][0]['text']=text
+            invalid=deepcopy(sample);invalid['claims'][0]['parts'][0]['text']=text
             with pytest.raises(ValidationError):schema.model_validate(invalid)
         if contexts:
             valid=deepcopy(sample);valid['claims'][0]['context_ids']=['CTX1'];schema.model_validate(valid)
+
+def test_direct_parts_cannot_shift_year_into_a_booking_count():
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+    from analyst_ai import structured
+    wire=dict(claims=[dict(parts=[dict(kind='text',text='In August '),dict(kind='period',field='year'),dict(kind='text',text=', phone contributed '),
+        dict(kind='value',citation=dict(result=0,row=0,column='count',format='plain')),dict(kind='text',text=' bookings.')],evidence=[],context_ids=[])],
+        investigation='',recommendation='',measurement='',missing_information='',chart=dict(kind='none',result=0,x='',y=''))
+    client=MagicMock();client.responses.parse.side_effect=lambda **kw:SimpleNamespace(output_parsed=kw['text_format'].model_validate(wire))
+    rows=[{'rows':[{'count':98}]}]
+    answer=structured(client,'gpt-4.1-mini',Answer,'test',{'results':rows,'plan':dict(context_start='2026-08-01',context_end='2026-08-31')})
+    assert bind_claim_values(rows,answer.claims[0].model_dump(),['2026-08-01','2026-08-31'])=='In August 2026, phone contributed 98 bookings.'
 
 def test_invalid_optional_baseline_keeps_valid_current_answer(db):
     p=Plan(intent='analysis',scope='Sarah day',missing_information='',queries=[],context_entity='Sarah',context_start='2026-09-17',context_end='2026-09-17',draft=None,
