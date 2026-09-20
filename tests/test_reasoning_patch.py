@@ -252,6 +252,10 @@ def test_commercial_answer_requires_leave_context_and_normalised_service_mix(db)
     mix=next(r for r in results if r['table']=='approved_service_mix_comparison')
     colour=next(r for r in mix['rows'] if r['current_revenue_aud']==540)
     assert colour['baseline_average_revenue_aud']==1800 and colour['difference_aud']==-1260
+    from analyst_ai import narration_evidence
+    safe=narration_evidence(results,p)
+    assert safe[2]['rows']==safe[3]['rows']==[] and results[3]['rows']
+    assert safe[4]['rows']==mix['rows']
     a=Answer(claims=[dict(text='Revenue changed.',evidence=[dict(result=0,row=0,column='service_revenue_aud')],context_ids=[])],investigation='',recommendation='',measurement='',missing_information='',chart=dict(kind='none',result=0,x='',y=''))
     notes=[dict(id='CTX1',event_type='annual_leave',start_date='2026-09-08',end_date='2026-09-09')]
     with pytest.raises(QueryBlocked,match='temporary availability'):validate_commercial_labels(db,p,a,results,notes)

@@ -6,7 +6,7 @@ from typing import Literal,Union
 from pydantic import BaseModel, Field
 from analyst_engine import RULES, QueryBlocked, reference_value, validate_chart, service_diagnostic, bind_claim_values, period_diagnostic
 
-ANSWER_RELEASE = '20 Sep 2026 · reasoning 12'
+ANSWER_RELEASE = '20 Sep 2026 · reasoning 13'
 
 class ContextDraft(BaseModel):
     entity: str
@@ -225,6 +225,14 @@ def preserve_explicit_staff_scope(plan,question,staff_rows):
         scope.staff=names
         plan.context_entity=', '.join(names)
         plan.scope=', '.join(names)+': '+scope.start_date+' to '+scope.end_date
+
+
+def narration_evidence(results,plan):
+    """Expose matched comparison values to narration; retain raw totals in audit."""
+    d=plan.diagnostic
+    if not d or d.comparison_divisor<=1:return results
+    return [{**r,'rows':[],'row_count':0,'note':'Raw multi-period baseline is retained in audit only. Use approved_period_comparison and approved_service_mix_comparison, already divided by the stated baseline divisor.'}
+        if r.get('table') in ['approved_staff_summary','approved_service_mix'] and r['rows'] and r['rows'][0].get('period_start')==d.comparison_start_date else r for r in results]
 
 
 def structured(client,model,schema,instructions,payload):
@@ -501,6 +509,7 @@ For a context contribution, prepare draft with stated entity/dates/event_type/ex
         'allowed_context_ids':[c['id'] for c in contexts],'execution_notes':execution_notes}
     for round_index in range(3):
         stage('Preparing the explanation' if round_index==0 else 'Investigating the next level of detail')
+        payload['results']=narration_evidence(results,plan)
         payload['remaining_analysis_rounds']=2-round_index
         answer=structured(client,model,Answer,WRITER+'\n'+rules+'\n'+GUIDANCE,payload)
         if not answer.additional_queries:break
