@@ -6,7 +6,7 @@ from typing import Literal,Union
 from pydantic import BaseModel, Field
 from analyst_engine import RULES, QueryBlocked, reference_value, validate_chart, service_diagnostic, bind_claim_values, period_diagnostic
 
-ANSWER_RELEASE = '20 Sep 2026 · reasoning 11'
+ANSWER_RELEASE = '20 Sep 2026 · reasoning 12'
 
 class ContextDraft(BaseModel):
     entity: str
@@ -212,6 +212,21 @@ def canonical_trend_request(queries):
     return TrendRequest(staff=staff,start_date=period[0],end_date=period[1],grain=grain,category=category)
 
 
+def preserve_explicit_staff_scope(plan,question,staff_rows):
+    """Do not inherit extra people into a plainly named new module request."""
+    import re
+    scope=plan.trend or plan.revenue or plan.diagnostic
+    if not scope:return
+    # Comparisons, pronouns and exclusions legitimately need semantic/history
+    # interpretation; only constrain unambiguous named-person requests here.
+    if re.search(r'\b(compare|comparison|versus|vs|against|between|both|other|everyone|all staff|except|excluding|apart|not|him|her|them)\b',question,re.I):return
+    names=[r['staff_name'] for r in staff_rows if re.search(r'(?<!\w)'+re.escape(r['staff_name'])+r'(?!\w)',question,re.I)]
+    if names and set(scope.staff)!=set(names):
+        scope.staff=names
+        plan.context_entity=', '.join(names)
+        plan.scope=', '.join(names)+': '+scope.start_date+' to '+scope.end_date
+
+
 def structured(client,model,schema,instructions,payload):
     import time
     from contextvars import ContextVar
@@ -327,6 +342,7 @@ For a context contribution, prepare draft with stated entity/dates/event_type/ex
         return {'plan':plan.model_dump(),'answer':None,'results':[],'contexts':[], 'status':plan.intent}
     if hasattr(db,'intake') and plan.queries and not (plan.trend or plan.booking_id or plan.diagnostic or plan.revenue):
         plan.trend=canonical_trend_request(plan.queries)
+    if hasattr(db,'intake'):preserve_explicit_staff_scope(plan,question,db.intake.tables.get('staff',[]))
     # A module owns its core retrieval. In particular a shortened ID must not be
     # queried again literally after the unique canonical ID has been resolved.
     if plan.booking_id:

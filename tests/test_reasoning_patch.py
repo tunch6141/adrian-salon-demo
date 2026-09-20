@@ -259,3 +259,15 @@ def test_commercial_answer_requires_leave_context_and_normalised_service_mix(db)
     validate_commercial_labels(db,p,a,results,notes)
     a.claims[0].evidence[0].result=3
     with pytest.raises(QueryBlocked,match='baseline_average'):validate_commercial_labels(db,p,a,results,notes)
+
+
+def test_new_explicit_staff_scope_does_not_inherit_previous_comparison():
+    from analyst_ai import preserve_explicit_staff_scope,TrendRequest
+    p=Plan(intent='lookup',scope='old comparison',missing_information='',queries=[],context_entity='Sarah',context_start='2026-05-01',context_end='2026-08-31',draft=None,
+        trend=TrendRequest(staff=['Sarah','Matthew'],start_date='2026-05-01',end_date='2026-08-31',grain='week',category='service'))
+    people=[dict(staff_name='Sarah'),dict(staff_name='Matthew'),dict(staff_name='Sam')]
+    preserve_explicit_staff_scope(p,"Show Sarah's weekly service revenue from May to August",people)
+    assert p.trend.staff==['Sarah']
+    p.trend.staff=['Sarah','Matthew']
+    preserve_explicit_staff_scope(p,'Compare Sarah against him for August',people)
+    assert p.trend.staff==['Sarah','Matthew']
