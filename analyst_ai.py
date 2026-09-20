@@ -171,6 +171,12 @@ def _investigate(client,model,db,question,history,context_store,stage):
         plan=structured(client,model,Plan,planner_rules+'\nCheck this refusal once: investigate measurable contributors if available, but keep unsupported for illness, motives or unavailable external benchmarks.',{**planning,'proposed_plan':plan.model_dump()})
     if plan.intent in ['unsupported','clarify','context']:
         return {'plan':plan.model_dump(),'answer':None,'results':[],'contexts':[], 'status':plan.intent}
+    # A module owns its core retrieval. In particular a shortened ID must not be
+    # queried again literally after the unique canonical ID has been resolved.
+    if plan.booking_id:
+        plan.queries=[];plan.diagnostic=plan.revenue=plan.trend=None
+    elif plan.trend:
+        plan.queries=[];plan.diagnostic=plan.revenue=None
     stage('Calculating results from the data')
     contexts=context_store.search(plan.context_entity,plan.context_start,plan.context_end)
     selected_scope=plan.trend or plan.revenue or plan.diagnostic
@@ -215,6 +221,12 @@ def _investigate(client,model,db,question,history,context_store,stage):
     if plan.booking_id:
         from analytics.diagnostics import booking_lookup
         results.extend(booking_lookup(db,plan.booking_id))
+        if results[0]['rows']:
+            record=results[0]['rows'][0]
+            day=record.get('appointment_start','')[:10]
+            plan.context_start=plan.context_end=day
+            plan.context_entity=record.get('staff_name') or 'Salon'
+            contexts=context_store.search(plan.context_entity,day,day)
     if plan.trend:
         from analytics.diagnostics import revenue_trend
         r=plan.trend

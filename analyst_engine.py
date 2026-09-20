@@ -283,7 +283,7 @@ def bind_claim_values(results,claim,periods,contexts=()):
     slot_pattern=r'\[\[(\d+|start|end|context\d+_(?:start|end))\]\]'
     without_slots=re.sub(slot_pattern,'',text)
     if re.search(r'\d',without_slots):
-        raise QueryBlocked('Use evidence placeholders for numbers, including years; do not type numerical facts.')
+        raise QueryBlocked('Unbound numeric text in the drafted claim: '+without_slots[:400]+'. Cite the exact ID/date/value cell using its evidence placeholder.')
     def replace(match):
         key=match.group(1)
         if not key.isdigit():
