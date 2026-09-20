@@ -174,7 +174,7 @@ def service_diagnostic(db,staff,start,end):
     if hasattr(db,'intake'):
         from analytics.diagnostics import staff_diagnostic
         return staff_diagnostic(db,staff,start,end)
-    from datetime import date
+    from datetime import date,datetime
     if not staff or not set(staff)<=set(['Sarah','Matthew','Sam']):raise QueryBlocked('Unknown staff in comparison')
     start,end=date.fromisoformat(start).isoformat(),date.fromisoformat(end).isoformat()
     if start>end:raise QueryBlocked('Comparison dates are reversed')
@@ -234,9 +234,21 @@ def bind_claim_values(results,claim,periods,contexts=()):
     text=claim['text']
     # Canonicalise only dates exactly equal to the trusted calculation scope.
     # Monetary values still require evidence slots, even when their digits resemble a date.
-    from datetime import date
+    from datetime import date,datetime
     slots=dict(zip(('start','end'),periods))
     pairs=[('start','end')]
+    # Date/time components are derived only from explicitly cited date cells.
+    for i,ref in enumerate(refs):
+        value=reference_value(results,ref)
+        if not isinstance(value,str):continue
+        try:
+            if 'T' in value:
+                stamp=datetime.fromisoformat(value)
+                slots[f'cell{i}_date']=stamp.date().isoformat()
+                slots[f'cell{i}_time']=stamp.strftime('%H:%M')
+            elif re.fullmatch(r'\d{4}-\d{2}-\d{2}',value):
+                slots[f'cell{i}_date']=date.fromisoformat(value).isoformat()
+        except ValueError:pass
     by_id={c['id']:c for c in contexts}
     for i,context_id in enumerate(claim.get('context_ids',[])):
         if context_id not in by_id:raise QueryBlocked('Unknown context citation')
@@ -245,12 +257,20 @@ def bind_claim_values(results,claim,periods,contexts=()):
         for key,field in zip(pair,('start_date','end_date')):
             slots[key]=by_id[context_id].get(field,'')
     dates={}
-    for key,value in slots.items():
+    for key,value in list(slots.items()):
         try: day=date.fromisoformat(value)
         except (ValueError,TypeError):continue
         dates[key]=day
-        for token in (day.isoformat(),f'{day.day} {day:%B %Y}',f'{day.day} {day:%b %Y}'):
-            text=re.sub(r'(?<![\w.])'+re.escape(token)+r'(?!\w)','[['+key+']]',text)
+        suffix='th' if 10<day.day%100<14 else {1:'st',2:'nd',3:'rd'}.get(day.day%10,'th')
+        tokens=[day.isoformat()]
+        for month in {day.strftime('%B'),day.strftime('%b'), 'Sept' if day.month==9 else day.strftime('%b')}:
+            for dd in [str(day.day),f'{day.day}{suffix}']:
+                tokens.extend([f'{dd} {month} {day.year}',f'{dd} {month}',f'{month} {dd}, {day.year}'])
+        for token in sorted(set(tokens),key=len,reverse=True):
+            text=re.sub(r'(?<![\w.])'+re.escape(token)+r'(?!\w)','[['+key+']]',text,flags=re.I)
+        # A month/year label or a range ending in that month remains a month
+        # label. Binding its year must not turn "in August" into "on Aug 31".
+        year_key=key+'_year';slots[year_key]=str(day.year)
     for first,last in pairs:
         if first not in dates or last not in dates:continue
         a,b=dates[first],dates[last]
@@ -260,6 +280,16 @@ def bind_claim_values(results,claim,periods,contexts=()):
             text=re.sub(pattern,f'[[{first}]] to [[{last}]]',text)
         # The end date may already have been canonicalised above.
         text=re.sub(rf'(?<![\w.]){a.day}\s*(?:to|–|-)\s*\[\[{last}\]\]',f'[[{first}]] to [[{last}]]',text)
+    for key,day in dates.items():
+        for month in {day.strftime('%B'),day.strftime('%b')}:
+            text=re.sub(r'\b('+month+r')\s+'+str(day.year)+r'\b',r'\1 [['+key+'_year]]',text,flags=re.I)
+    for key,value in slots.items():
+        if not key.endswith('_time'):continue
+        clock=datetime.strptime(value,'%H:%M')
+        candidates=[value,value+':00',clock.strftime('%I:%M%p').lstrip('0'),clock.strftime('%I:%M %p').lstrip('0')]
+        if clock.minute==0:candidates.extend([clock.strftime('%I%p').lstrip('0'),clock.strftime('%I %p').lstrip('0')])
+        for token in sorted(candidates,key=len,reverse=True):
+            text=re.sub(r'(?<![\w:])'+re.escape(token)+r'(?![\w:])','[['+key+']]',text,flags=re.I)
     # A literal copied exactly from its cited cell is just another spelling of
     # the same slot, not a new model calculation. Semantic review still checks
     # that the chosen cell supports the meaning. Never search uncited cells.
@@ -280,7 +310,7 @@ def bind_claim_values(results,claim,periods,contexts=()):
             for n in range(0,len(chunks),2):
                 chunks[n]=re.sub(r'(?<![\w.,])'+re.escape(candidate)+r'(?!\w|[.,]\d)',f'[[{i}]]',chunks[n])
             text=''.join(chunks)
-    slot_pattern=r'\[\[(\d+|start|end|context\d+_(?:start|end))\]\]'
+    slot_pattern=r'\[\[(\d+|'+ '|'.join(re.escape(k) for k in slots) +r')\]\]'
     without_slots=re.sub(slot_pattern,'',text)
     if re.search(r'\d',without_slots):
         raise QueryBlocked('Unbound numeric text in the drafted claim: '+without_slots[:400]+'. Cite the exact ID/date/value cell using its evidence placeholder.')
@@ -302,7 +332,7 @@ def bind_claim_values(results,claim,periods,contexts=()):
         return str(value)
     rendered=re.sub(slot_pattern,replace,text)
     if '[[' in rendered:raise QueryBlocked('Malformed evidence placeholder')
-    return rendered
+    return rendered.replace('AUD AUD ','AUD ')
 
 
 def period_diagnostic(db,staff,start,end,comparison_start,comparison_end,divisor=1):

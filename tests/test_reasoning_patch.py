@@ -76,6 +76,17 @@ def test_exact_cited_literal_is_normalised_but_fabrication_is_blocked():
     for text in ['Revenue AUD 12,201.00.','Booking B00005.','Revenue AUD 24,400.00.']:
         with pytest.raises(QueryBlocked):bind_claim_values(results,{**claim,'text':text},['',''])
 
+def test_real_model_date_spellings_bind_only_to_trusted_dates():
+    for spelling in ['17th Sep 2026','17th September 2026','17 September','September 17, 2026']:
+        claim=dict(text='Sarah generated [[0]] on '+spelling+'.',evidence=[dict(result=0,row=0,column='amount',format='money')])
+        assert bind_claim_values([{'rows':[{'amount':420}]}],claim,['2026-09-17','2026-09-17'])=='Sarah generated AUD 420.00 on 2026-09-17.'
+    claim=dict(text='In August 2026 the total was [[0]].',evidence=[dict(result=0,row=0,column='amount',format='money')])
+    assert bind_claim_values([{'rows':[{'amount':12200}]}],claim,['2026-08-01','2026-08-31'])=='In August 2026 the total was AUD 12,200.00.'
+    claim=dict(text='The appointment starts on 22nd June 2026.',evidence=[dict(result=0,row=0,column='appointment_start')])
+    assert '2026-06-22' in bind_claim_values([{'rows':[{'appointment_start':'2026-06-22T15:00:00+10:00'}]}],claim,['',''])
+    with pytest.raises(QueryBlocked):
+        bind_claim_values([{'rows':[{'appointment_start':'2026-06-22T15:00:00+10:00'}]}],{**claim,'text':'The appointment starts on 23rd June 2026.'},['',''])
+
 def test_context_only_lookup_runs_writer_and_review(db):
     p=Plan(intent='lookup',scope='Sarah notes',missing_information='',queries=[],context_entity='Sarah',context_start='2026-09-07',context_end='2026-09-13',draft=None)
     a=Answer(claims=[dict(text='The owner reported leave from [[context0_start]] to [[context0_end]].',evidence=[],context_ids=['CTX1'])],investigation='',recommendation='',measurement='',missing_information='',chart=dict(kind='none',result=0,x='',y=''))
