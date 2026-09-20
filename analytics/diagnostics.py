@@ -184,7 +184,10 @@ def revenue_trend(db,staff,start,end,grain,category):
         'buckets':sum(r['staff_name']==name for r in rows)} for name in selected]
     for total in totals:
         full=[r for r in rows if r['staff_name']==total['staff_name'] and not r['partial_calendar_bucket'] and r['coverage']=='complete']
+        values=[r['net_revenue_aud'] for r in full]
+        pattern='insufficient periods' if len(values)<2 else 'unchanged' if len(set(values))==1 else 'nondecreasing' if all(a<=b for a,b in zip(values,values[1:])) else 'nonincreasing' if all(a>=b for a,b in zip(values,values[1:])) else 'fluctuating'
         total.update(complete_buckets=len(full),
+            complete_bucket_pattern=pattern,
             minimum_complete_bucket_revenue=min((r['net_revenue_aud'] for r in full),default=None),
             maximum_complete_bucket_revenue=max((r['net_revenue_aud'] for r in full),default=None),
             first_complete_bucket_revenue=full[0]['net_revenue_aud'] if full else None,

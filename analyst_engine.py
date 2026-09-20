@@ -233,6 +233,9 @@ def bind_claim_values(results,claim,periods,contexts=()):
     refs=claim['evidence']
     text=claim['text']
     columns={ref['column'] for ref in refs}
+    if re.search(r'\b(rose steadily|grew steadily|increased steadily|steadily rose|steadily grew|steadily increased|steady growth|consistent growth)\b',text,re.I):
+        if any(row.get('complete_bucket_pattern')=='fluctuating' for r in results if r.get('table')=='approved_trend_totals' for row in r['rows']):
+            raise QueryBlocked('The complete periods fluctuate. Describe the overall first-to-last movement without claiming steady or consistent growth.')
     if any(r.get('table')=='approved_revenue_trend' for r in results) and re.search(r'\brang\w*\b|\bup to\b|\b(highest|lowest|peak|maximum|minimum)\b',text,re.I):
         required={'minimum_complete_bucket_revenue','maximum_complete_bucket_revenue'}
         if not columns & required:

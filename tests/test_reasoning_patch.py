@@ -41,6 +41,13 @@ def test_short_identifier_never_guesses_between_multiple_records(db):
     with pytest.raises(QueryBlocked):booking_lookup(db,'B0004')
     assert booking_lookup(db,'B00004')[0]['rows'][0]['booking_id']=='B00004'
 
+def test_record_route_renders_exact_fields_without_freeform_rewriting(db):
+    p=Plan(intent='lookup',scope='Booking B0004',missing_information='',queries=[],booking_id='B0004',context_entity='',context_start='',context_end='',draft=None)
+    with patch('analyst_ai.structured',return_value=p) as calls:
+        result=investigate(None,'gpt-4.1-mini',db,'Show booking B0004',[],ContextStore())
+    assert calls.call_count==1 and result['status']=='answered'
+    assert result['answer']['claims'][0]['text']=='Booking B00004 is marked Completed, assigned to Sarah, for customer C0004.'
+
 def test_single_day_and_staff_comparison(db):
     r=staff_diagnostic(db,['Sarah'],'2026-09-17','2026-09-17')[0]['rows'][0]
     assert r['service_revenue_aud']==420 and r['completed_appointments']==6
@@ -65,6 +72,9 @@ def test_weekly_trend_covers_full_may_to_august(db):
     assert totals['minimum_complete_bucket_revenue']==1030
     assert totals['maximum_complete_bucket_revenue']==2780
     assert totals['last_minus_first_complete_bucket']==1735
+    assert totals['complete_bucket_pattern']=='fluctuating'
+    with pytest.raises(QueryBlocked):
+        bind_claim_values(results,dict(text='Revenue rose steadily.',evidence=[dict(result=1,row=0,column='last_minus_first_complete_bucket')]),['2026-05-01','2026-08-31'])
     with pytest.raises(QueryBlocked):
         bind_claim_values(results,dict(text='Revenue ranged up to [[0]].',evidence=[dict(result=0,row=11,column='net_revenue_aud',format='money')]),['2026-05-01','2026-08-31'])
 

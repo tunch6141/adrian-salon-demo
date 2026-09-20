@@ -2,7 +2,7 @@
 from collections import defaultdict
 from datetime import date,timedelta
 import pandas as pd
-from .calculations import (financial_lines,completed_services,capacity_rows,stock_coverage,landed_receipts,
+from .calculations import (local_date,financial_lines,completed_services,capacity_rows,stock_coverage,landed_receipts,
     quote_queue,receivables,future_workload,customer_returns,capability_rows,enabled,staff_return_outcomes,booking_outcomes,pricing_simulation)
 from .costing import allocate_costs
 
@@ -73,7 +73,8 @@ def build_views(intake):
     # deterministic and many-to-one; it cannot multiply financial line values.
     staff_names={r['staff_id']:r['staff_name'] for r in intake.tables.get('staff',[])}
     customers={r['customer_id']:r for r in intake.tables.get('customers',[])}
-    rows['booking_records']=[{**r,'staff_name':staff_names.get(r.get('staff_id')),
+    rows['booking_records']=[{**r,'appointment_date':str(local_date(r.get('appointment_start'),intake.zone)) if r.get('appointment_start') else None,
+        'staff_name':staff_names.get(r.get('staff_id')),
         'customer_name':customers.get(r.get('customer_id'),{}).get('customer_name')}
         for r in intake.tables.get('bookings',[])]
     rows['customer_records']=[dict(r) for r in intake.tables.get('customers',[])]

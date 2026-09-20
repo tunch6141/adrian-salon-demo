@@ -155,7 +155,7 @@ def structured(client,model,schema,instructions,payload):
         evidence_field=Field(default_factory=list) if citations else Field(default_factory=list,max_length=0)
         claim_type=create_model('EvidenceClaim',__base__=Claim,context_ids=(context_type,context_field),
             evidence=(list[citation_type],evidence_field),
-            text=(str,Field(pattern=r'^(?:[^0-9\[\]]|\[\[(?:[0-9]+|start|end|context[0-9]+_(?:start|end))\]\])*$',
+            text=(str,Field(pattern=r'^(?:[^0-9\[\]{}]|\[\[(?:[0-9]+|start|end|context[0-9]+_(?:start|end))\]\])*$',
                 description='Write prose with all numeric facts, dates, years and IDs containing digits inserted through [[0]], [[1]], [[start]], [[end]] or cited context date placeholders. Never type literal digits.')))
         answer_type=create_model('Answer',__base__=Answer,claims=(list[claim_type],Field(max_length=4)))
         schema=answer_type if schema is Answer else create_model('Review',__base__=Review,revised_answer=(answer_type|None,None))
@@ -283,6 +283,16 @@ def _investigate(client,model,db,question,history,context_store,stage):
             plan.context_start=plan.context_end=day
             plan.context_entity=record.get('staff_name') or 'Salon'
             contexts=context_store.search(plan.context_entity,day,day)
+            # An individual record display needs no creative narration. The model
+            # routes the question; exact fields are rendered from its tool result.
+            claim=Claim(text='Booking [[0]] is marked [[1]], assigned to [[2]], for customer [[3]].',
+                evidence=[Citation(result=0,row=0,column=c) for c in ['booking_id','status','staff_name','customer_id']],context_ids=[])
+            claim.text=bind_claim_values(results,claim.model_dump(),[day,day],contexts)
+            answer=Answer(claims=[claim],investigation='',recommendation='',measurement='',missing_information='',chart=Chart(kind='none',result=0,x='',y=''))
+            return {'plan':plan.model_dump(),'answer':answer.model_dump(),'results':results,'contexts':contexts,
+                'status':'answered','issues':[],'execution_notes':['Exact record fields rendered from the approved booking lookup.']}
+        plan.missing_information='No saved cleaned booking matched that identifier. Please check the full booking ID.'
+        return {'plan':plan.model_dump(),'answer':None,'results':results,'contexts':[], 'status':'clarify','issues':[]}
     if plan.trend:
         from analytics.diagnostics import revenue_trend
         r=plan.trend
