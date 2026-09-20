@@ -6,7 +6,7 @@ from typing import Literal,Union
 from pydantic import BaseModel, Field
 from analyst_engine import RULES, QueryBlocked, reference_value, validate_chart, service_diagnostic, bind_claim_values, period_diagnostic
 
-ANSWER_RELEASE = '20 Sep 2026 · reasoning 18'
+ANSWER_RELEASE = '20 Sep 2026 · reasoning 19'
 
 class ContextDraft(BaseModel):
     entity: str
@@ -587,7 +587,11 @@ For a context contribution, prepare draft with stated entity/dates/event_type/ex
                 if not claim.evidence and not claim.context_ids:raise QueryBlocked('A factual claim has no evidence.')
                 if not set(claim.context_ids)<=set(c['id'] for c in contexts):raise QueryBlocked('Unknown context citation. Use only allowed_context_ids; when empty, every context_ids list must be [].')
                 claim.text=bind_claim_values(results,claim.model_dump(),evidence_periods,contexts)
-            validate_chart(results,bound.chart.model_dump())
+            try:validate_chart(results,bound.chart.model_dump())
+            except QueryBlocked as chart_error:
+                execution_notes.append('Optional chart omitted: '+str(chart_error))
+                bound.chart=Chart(kind='none',result=0,x='',y='')
+                answer.chart=bound.chart
             break
         except QueryBlocked as error:
             issues=[str(error)]
@@ -614,7 +618,10 @@ For a context contribution, prepare draft with stated entity/dates/event_type/ex
                 if not claim.evidence and not claim.context_ids:raise QueryBlocked('A factual claim has no evidence.')
                 if not set(claim.context_ids)<=set(c['id'] for c in contexts):raise QueryBlocked('Unknown context citation')
                 claim.text=bind_claim_values(results,claim.model_dump(),evidence_periods,contexts)
-            validate_chart(results,bound.chart.model_dump())
+            try:validate_chart(results,bound.chart.model_dump())
+            except QueryBlocked as chart_error:
+                execution_notes.append('Optional chart omitted: '+str(chart_error))
+                bound.chart=Chart(kind='none',result=0,x='',y='')
         except QueryBlocked as error:
             return {'plan':plan.model_dump(),'answer':None,'results':results,'contexts':contexts,'status':'facts_only','issues':[str(error)]}
     return {'plan':plan.model_dump(),'answer':bound.model_dump(),'results':results,'contexts':contexts,'status':'answered','issues':review.issues,'execution_notes':execution_notes}
