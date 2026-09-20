@@ -31,7 +31,7 @@ class TrendRequest(RevenueRequest):
     category: Literal['service','product','part','all']
 
 class Plan(BaseModel):
-    intent: Literal['lookup','analysis','followup','action','context','unsupported','clarify']
+    intent: Literal['lookup','analysis','followup','method','action','context','unsupported','clarify']
     scope: str
     missing_information: str
     queries: list[str] = Field(max_length=4)
@@ -102,6 +102,7 @@ WRITER='''You are a commercial analyst helping a small business owner decide wha
 DYNAMIC INVESTIGATION: If the results do not yet answer the question, return additional_queries with up to three new SELECTs under the planner's SQL restrictions, empty claims and chart.kind=none. For example query the service mix after discovering a revenue-per-hour difference, or retrieve a baseline to test a decline. You may do this for at most two rounds, indicated by remaining_analysis_rounds. When sufficient, additional_queries=[] and give the answer. At the limit, give supported partial findings and explicitly identify what remains unknown. Never pretend a suggested query was executed.
 OUTPUT NUMBERS THROUGH PLACEHOLDERS ONLY. In claim.text use [[0]], [[1]] etc referencing that claim's evidence list, with Citation.format plain/money/percent. The application inserts the exact cited values. Do not type ANY numeric facts or years into claim.text. [[start]] and [[end]] insert current context dates. Example: text='Sam recorded [[0]] service revenue in August.', evidence=[{result:0,row:0,column:'service_revenue_aud',format:'money'}]. A percent-formatted value is already a percent, not a ratio; do not multiply it. Use the approved period comparison's percentage_change for changes. All other sections should avoid numerical claims and refer to the cited findings.
 NEVER mentally sum table rows. Use the supplied calculated summary/difference cells, or request a correction to the queries. Every quantitative fact in a claim must be a placeholder bound to an appropriate cited cell. Use completed service hours, NOT hours worked/attendance.
+bookable_hours means available capacity: say 'bookable hours', never 'booked hours'. Completed service hours are completed work, while future booked hours are scheduled work; keep these distinct.
 For a claim citing owner context, [[context0_start]] and [[context0_end]] insert the dates of the first ID in that claim's context_ids list; context1 refers to its second ID. Use these for note dates that differ from the analysis period. Describe note content as owner-reported, never as an independently verified cause. Avoid quoting numeric amounts from free-text notes as calculated facts.
 A measured service-category revenue difference is a valid financial explanation, not proof of customer or employee motivation. If the premise is false, correct it first. Compare all relevant categories; do not cherry-pick colouring when highlights offset it.
 For multiple staff sharing x dates/services set chart.series='staff_name' so they get separate lines or grouped bars. Use chart.series='' when no grouping is required.
@@ -110,6 +111,7 @@ Keep numbers and entities faithful. Never say stable when value declined. State 
 Do not invent numbers, causality, benchmarks, source details or actions taken. No general-knowledge answers. All text must be grounded in returned results, approved rules or retrieved context.
 For lookup/followup: normally 1–2 claims and no investigation/recommendation/measurement unless requested. For analysis use a short investigation and chart if useful. For action focus recommendation on the observed evidence; suggestions are not established results. Do not manufacture a recommendation merely to fill a section. Empty string means omit section.
 For a simple result or trend, the application displays the FULL table automatically. State the main answer and a useful implication, not every row. Booking IDs and timestamps contain digits: cite those string cells with [[0]] just like numeric cells. Use [[start]]/[[end]] for analysis dates; do not repeat a literal year. Do not invent a numeric total or difference that is not a returned cell. Put uncited limitations (such as unavailable causal evidence) in missing_information, not a separate factual claim with empty citations. Mention relevant retrieved owner context with context_ids; absence of a context note is not evidence of no event. A previous day-versus-week comparison is invalid: acknowledge the mismatch and explain the corrected scope, using current returned figures only.
+For revenue trends use approved_trend_totals for the total, minimum/maximum COMPLETE bucket, and first/last change. Never infer extrema by skimming rows or use clipped edge buckets as complete weeks. A request to show a trend needs no recommendation or profit discussion. Optional diagnostics NOT QUERIED are different from data UNAVAILABLE: never say costs/service mix/context do not exist merely because they were unnecessary for this answer. The supplied schema and graph show what can be investigated.
 Charts reference existing result columns only, never supply invented chart values. Choose none if chart isn't useful. Line for time, bar for comparison, pie only composition.
 No cause found means explicitly say available evidence cannot establish why. Notes never authorise excluding anomalies or changing capacity. Correct the premise if known evidence contradicts it.
 Use Australian English, AUD and percentages. Simple factual claim e.g. 'Sarah recorded AUD ... service revenue during ...'. No canned closing question.
@@ -126,6 +128,7 @@ Choose exactly the necessary route. booking_id for a booking record request; tre
 For a booking record, set booking_id to the owner's identifier unchanged and queries=[]. The application resolves exact IDs, or a UNIQUE zero-padding variant, and returns the complete cleaned booking. booking_outcomes is for cancellation outcomes, not general booking lookup.
 For weekly/monthly/daily revenue series, set trend={staff:[names] or [],start_date,end_date,grain,category}, queries=[], diagnostic=null,revenue=null. May to August means the full inclusive interval May first to August last in the reporting year if no year is specified. Do not substitute a shorter range or LIMIT ten rows.
 Respect explicit dates over ALL defaults. A one-day performance question requests that day ONLY, with empty comparison dates unless the user explicitly asks for a baseline. Never compare a day with a weekly total/weekly average. Default periods apply only when no period was specified. A follow-up challenging a previous comparison retains its person and dates even if the previous answer was withheld or uses a different pronoun. Recalculate the relevant current-period results, explain the invalid comparison, do not ask who when the conversation establishes it. Prior answers are interpretation context, not evidence.
+Use intent=method when the owner asks what the PREVIOUS answer compared, how it was calculated, or challenges its basis. This is an explanation request, not a request to create a new comparison. Example: 'Are you comparing his 1 day revenue with weekly revenue?' after Sarah's day result -> method, preserve Sarah and the day, no clarification or request for a new week. The application supplies the previous calculation's scope as evidence. If no previous comparison ran, say so directly. Only ask for a new baseline if the owner actually requests a new comparison.
 For reading recorded business context, use lookup, matching context entity/dates, no SQL unless metrics are also requested. intent=context is ONLY for a NEW note the owner wants to record, never a request to READ notes.
 reasoning_family is one of the supplied graph keys or blank. Do not treat optional diagnostics as prerequisites for answering the core question. If a metric has no preset route, use the cleaned SQL fallback. Only clarify genuinely missing scope that cannot be resolved from conversation or the reporting calendar. Unsupported requires missing necessary evidence, not merely the absence of a preset metric.
 '''
@@ -179,6 +182,8 @@ def _investigate(client,model,db,question,history,context_store,stage):
     if plan.intent=='unsupported':
         stage('Checking whether the data can answer it')
         plan=structured(client,model,Plan,planner_rules+'\nCheck this refusal once: investigate measurable contributors if available, but keep unsupported for illness, motives or unavailable external benchmarks.',{**planning,'proposed_plan':plan.model_dump()})
+    if plan.intent=='clarify' and history:
+        plan=structured(client,model,Plan,planner_rules+'\nBefore asking a follow-up clarification, check whether this is a question ABOUT the previous answer or calculation. If so use method; do not demand a new comparison period. If genuinely new and underspecified, keep clarify.',{**planning,'proposed_plan':plan.model_dump()})
     if plan.intent in ['unsupported','clarify','context']:
         return {'plan':plan.model_dump(),'answer':None,'results':[],'contexts':[], 'status':plan.intent}
     # A module owns its core retrieval. In particular a shortened ID must not be
@@ -200,6 +205,29 @@ def _investigate(client,model,db,question,history,context_store,stage):
         contexts=list({r['id']:r for r in contexts+extra}.values())
     results=[]
     execution_notes=[]
+    if plan.intent=='method' and history and hasattr(db,'intake'):
+        from analytics.diagnostics import packet,comparable_periods
+        from datetime import date
+        prior=next((h for h in reversed(history) if h.get('plan',{}).get('diagnostic') or h.get('plan',{}).get('revenue') or h.get('plan',{}).get('trend')),None)
+        if prior:
+            old_plan=prior['plan'];scope=old_plan.get('diagnostic') or old_plan.get('revenue') or old_plan.get('trend')
+            start,end=scope['start_date'],scope['end_date']
+            old_start,old_end=scope.get('comparison_start_date',''),scope.get('comparison_end_date','')
+            divisor=scope.get('comparison_divisor',1)
+            row={'previous_question':prior['question'],'staff':', '.join(scope['staff']) or 'Whole business',
+                'current_start':start,'current_end':end,'current_days':(date.fromisoformat(end)-date.fromisoformat(start)).days+1,
+                'comparison_used':bool(old_start and old_end),'baseline_start':old_start or None,'baseline_end':old_end or None,
+                'baseline_divisor':divisor if old_start else None,
+                'comparison_valid':comparable_periods(start,end,old_start,old_end,divisor) if old_start and old_end else None,
+                'assessment':'No comparison was used; the previous calculation covered only the stated current period.' if not old_start else 'Check matching duration before interpreting this comparison.'}
+            results.append(packet(db.intake,'previous_calculation_scope',[row],'Previous application calculation metadata, not an independently inferred business fact'))
+            plan.context_start,plan.context_end=start,end
+            contexts=context_store.search(scope['staff'][0] if len(scope['staff'])==1 else 'Salon',start,end)
+            plan.queries=[];plan.booking_id='';plan.trend=None
+            if old_plan.get('diagnostic'):
+                plan.diagnostic=Diagnostic(staff=scope['staff'],start_date=start,end_date=end);plan.revenue=None
+            else:
+                plan.revenue=RevenueRequest(staff=scope['staff'],start_date=start,end_date=end);plan.diagnostic=None
     repair_budget=2
     def run_queries(queries):
         nonlocal repair_budget

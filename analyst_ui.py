@@ -60,6 +60,8 @@ def render_result(item):
         a=item['answer']
         for claim in a['claims']:
             safe_text(claim['text'])
+        if item['plan'].get('trend'):
+            st.caption('Calendar periods are clipped to your requested dates. Partial first/last periods should not be compared with full periods.')
         if item['plan'].get('booking_id') or item['plan'].get('trend') or (item['plan'].get('queries') and not item['plan'].get('diagnostic')):
             for result in item['results']:
                 if result['table']=='approved_trend_totals':continue

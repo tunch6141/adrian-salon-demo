@@ -232,6 +232,13 @@ def bind_claim_values(results,claim,periods,contexts=()):
     import re
     refs=claim['evidence']
     text=claim['text']
+    columns={ref['column'] for ref in refs}
+    if any(r.get('table')=='approved_revenue_trend' for r in results) and re.search(r'\brang\w*\b|\bup to\b|\b(highest|lowest|peak|maximum|minimum)\b',text,re.I):
+        required={'minimum_complete_bucket_revenue','maximum_complete_bucket_revenue'}
+        if not columns & required:
+            raise QueryBlocked('Trend extrema must cite the calculated minimum/maximum complete bucket in approved_trend_totals, not a selected individual row or partial week.')
+    if 'bookable_hours' in columns and re.search(r'\bbooked hours\b',text,re.I) and 'booked_hours' not in columns:
+        raise QueryBlocked('bookable_hours is available capacity, not booked hours. Say bookable hours or available capacity.')
     # Canonicalise only dates exactly equal to the trusted calculation scope.
     # Monetary values still require evidence slots, even when their digits resemble a date.
     from datetime import date,datetime

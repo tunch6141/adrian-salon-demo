@@ -34,6 +34,8 @@ def staff_diagnostic(db,staff,start,end):
             x,y=a[metric],b[metric]
             differences.append({'first_staff':a['staff_name'],'second_staff':b['staff_name'],'metric':metric,
                 'first_value':x,'second_value':y,'difference_first_minus_second':x-y if x is not None and y is not None else None,
+                'absolute_difference':abs(x-y) if x is not None and y is not None else None,
+                'higher_staff':a['staff_name'] if x is not None and y is not None and x>y else b['staff_name'] if x is not None and y is not None and y>x else None,
                 'percentage_difference_vs_second':100*(x-y)/y if x is not None and y else None})
         results.append(packet(db.intake,'approved_staff_differences',differences,scope))
     return results
@@ -105,7 +107,18 @@ def revenue_diagnostic(db,staff,start,end):
                            ('part_revenue_aud','part_revenue'),('total_net_revenue_aud','net_revenue')]:
             row[output]=float(value[key]) if value['status']=='Available' and value.get(key) is not None else None
         rows.append(row)
-    return [packet(db.intake,'approved_revenue_summary',rows,f'{start} through {end}')]
+    results=[packet(db.intake,'approved_revenue_summary',rows,f'{start} through {end}')]
+    if len(rows)==2:
+        a,b=rows;differences=[]
+        for metric in ['service_revenue_aud','retail_revenue_aud','part_revenue_aud','total_net_revenue_aud']:
+            x,y=a[metric],b[metric];available=x is not None and y is not None
+            differences.append({'first_staff':a['staff_name'],'second_staff':b['staff_name'],'metric':metric,
+                'first_value':x,'second_value':y,'difference_first_minus_second':x-y if available else None,
+                'absolute_difference':abs(x-y) if available else None,
+                'higher_staff':a['staff_name'] if available and x>y else b['staff_name'] if available and y>x else None,
+                'percentage_difference_vs_second':100*(x-y)/y if available and y else None})
+        results.append(packet(db.intake,'approved_staff_differences',differences,f'{start} through {end}'))
+    return results
 
 
 def booking_lookup(db,booking_id):
@@ -169,5 +182,16 @@ def revenue_trend(db,staff,start,end,grain,category):
     totals=[{'staff_name':name,'period_start':start,'period_end':end,'category':category,
         'net_revenue_aud':round(sum(r['net_revenue_aud'] for r in rows if r['staff_name']==name),2),
         'buckets':sum(r['staff_name']==name for r in rows)} for name in selected]
+    for total in totals:
+        full=[r for r in rows if r['staff_name']==total['staff_name'] and not r['partial_calendar_bucket'] and r['coverage']=='complete']
+        total.update(complete_buckets=len(full),
+            minimum_complete_bucket_revenue=min((r['net_revenue_aud'] for r in full),default=None),
+            maximum_complete_bucket_revenue=max((r['net_revenue_aud'] for r in full),default=None),
+            first_complete_bucket_revenue=full[0]['net_revenue_aud'] if full else None,
+            last_complete_bucket_revenue=full[-1]['net_revenue_aud'] if full else None,
+            first_complete_bucket_start=full[0]['period_start'] if full else None,
+            last_complete_bucket_start=full[-1]['period_start'] if full else None,
+            last_minus_first_complete_bucket=round(full[-1]['net_revenue_aud']-full[0]['net_revenue_aud'],2) if full else None,
+            partial_bucket_note='Edge buckets are clipped to the requested dates; exclude them from whole-period comparisons.')
     return [packet(db.intake,'approved_revenue_trend',rows,f'{start} through {end}'),
             packet(db.intake,'approved_trend_totals',totals,f'{start} through {end}')]
