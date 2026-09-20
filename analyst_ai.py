@@ -135,6 +135,16 @@ def structured(client,model,schema,instructions,payload):
     import time
     from contextvars import ContextVar
     extra={'reasoning':{'effort':'low'}} if model.startswith('gpt-5.6') else {}
+    if schema in (Answer,Review):
+        # Restrict context citations to notes actually retrieved for this turn.
+        # With no matching notes, the model can only emit an empty list.
+        from pydantic import create_model
+        ids=tuple(c['id'] for c in payload.get('contexts',[]))
+        context_type=list[Literal[ids]] if ids else list[str]
+        context_field=Field(default_factory=list) if ids else Field(default_factory=list,max_length=0)
+        claim_type=create_model('EvidenceClaim',__base__=Claim,context_ids=(context_type,context_field))
+        answer_type=create_model('Answer',__base__=Answer,claims=(list[claim_type],Field(max_length=4)))
+        schema=answer_type if schema is Answer else create_model('Review',__base__=Review,revised_answer=(answer_type|None,None))
     started=time.monotonic()
     response=client.responses.parse(model=model,instructions=instructions,input=json.dumps(payload,default=str),text_format=schema,max_output_tokens=3000,store=False,**extra)
     stats=ACTIVE_STATS.get()
@@ -255,7 +265,8 @@ def _investigate(client,model,db,question,history,context_store,stage):
         plan.missing_information='No matching records or confirmed business notes were found for this scope. Please check the identifier or period.'
         return {'plan':plan.model_dump(),'answer':None,'results':[],'contexts':[], 'status':'clarify',
                 'issues':['No matching evidence was found.']}
-    payload={**planning,'plan':plan.model_dump(),'results':results,'contexts':contexts,'execution_notes':execution_notes}
+    payload={**planning,'plan':plan.model_dump(),'results':results,'contexts':contexts,
+        'allowed_context_ids':[c['id'] for c in contexts],'execution_notes':execution_notes}
     for round_index in range(3):
         stage('Preparing the explanation' if round_index==0 else 'Investigating the next level of detail')
         payload['remaining_analysis_rounds']=2-round_index
@@ -280,7 +291,7 @@ def _investigate(client,model,db,question,history,context_store,stage):
             if not bound.claims:raise QueryBlocked('The explanation must include supported findings.')
             for claim in bound.claims:
                 if not claim.evidence and not claim.context_ids:raise QueryBlocked('A factual claim has no evidence.')
-                if not set(claim.context_ids)<=set(c['id'] for c in contexts):raise QueryBlocked('Unknown context citation')
+                if not set(claim.context_ids)<=set(c['id'] for c in contexts):raise QueryBlocked('Unknown context citation. Use only allowed_context_ids; when empty, every context_ids list must be [].')
                 claim.text=bind_claim_values(results,claim.model_dump(),evidence_periods,contexts)
             validate_chart(results,bound.chart.model_dump())
             break
