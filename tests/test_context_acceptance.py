@@ -53,3 +53,23 @@ def test_unconfirmed_validation_context_is_excluded():
               explanation='Unreviewed claim',source_name='Test',recorded_at='2026-09-20T00:00:00Z',confirmed=False)
     intake=load_snapshot({'p1_context':[note]})
     assert 'UNCONFIRMED' not in {r['id'] for r in intake.contexts}
+
+
+def test_context_form_requires_owner_confirmation_before_saving():
+    from streamlit.testing.v1 import AppTest
+    app=AppTest.from_string('''
+import streamlit as st
+from analyst_ui import context_form
+from business_context import ContextStore
+rows=st.session_state.setdefault('test_rows',[])
+st.session_state.setdefault('context_draft',dict(entity='Sarah',start_date='2026-09-08',end_date='2026-09-09',event_type='leave',explanation='Controlled test note'))
+context_form(ContextStore(session_rows=rows))
+''',default_timeout=30).run()
+    next(x for x in app.text_input if x.label=='Reported by').set_value('Acceptance test owner')
+    next(x for x in app.button if x.label=='Keep context for this session').click().run()
+    assert not app.exception and app.session_state['test_rows']==[]
+    app.checkbox[0].check()
+    next(x for x in app.button if x.label=='Keep context for this session').click().run()
+    assert not app.exception
+    assert len(app.session_state['test_rows'])==1
+    assert app.session_state['test_rows'][0]['source_name']=='Acceptance test owner'

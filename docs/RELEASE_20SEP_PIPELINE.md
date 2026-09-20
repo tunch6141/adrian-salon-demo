@@ -1,5 +1,7 @@
 # Persistent raw data and approval pipeline
 
+**Follow-up acceptance status:** The focused tests requested after this release found remaining live context-response failures. The pipeline checks pass, but context explanations are not yet fully accepted. See [20 September acceptance results](ACCEPTANCE_20SEP_2026.md) for exact tests, the deployed date-binding fix, and outstanding cases.
+
 Released 20 September 2026. This stage connects the existing salon adapter, owner review screen and analytical engine to Supabase. It implements the agreed raw-to-clean workflow from the master handoff; it does not claim that the entire expanded metric catalogue has been implemented.
 
 ## Data flow
