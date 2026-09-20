@@ -242,3 +242,20 @@ def test_show_trend_has_complete_calendar_summary_without_narrator_guessing(db):
     text=result['answer']['claims'][0]['text']
     assert '35,340.00' in text and '1,030.00' in text and '2,780.00' in text and 'fluctuated' in text
     assert '140.00' not in text and '720.00' not in text
+
+
+def test_commercial_answer_requires_leave_context_and_normalised_service_mix(db):
+    from analyst_ai import validate_commercial_labels
+    p=Plan(intent='analysis',scope='Sarah week',missing_information='',queries=[],context_entity='Sarah',context_start='2026-09-07',context_end='2026-09-13',draft=None,
+        diagnostic=Diagnostic(staff=['Sarah'],start_date='2026-09-07',end_date='2026-09-13',comparison_start_date='2026-08-10',comparison_end_date='2026-09-06',comparison_divisor=4))
+    results=period_diagnostic(db,['Sarah'],'2026-09-07','2026-09-13','2026-08-10','2026-09-06',4)
+    mix=next(r for r in results if r['table']=='approved_service_mix_comparison')
+    colour=next(r for r in mix['rows'] if r['current_revenue_aud']==540)
+    assert colour['baseline_average_revenue_aud']==1800 and colour['difference_aud']==-1260
+    a=Answer(claims=[dict(text='Revenue changed.',evidence=[dict(result=0,row=0,column='service_revenue_aud')],context_ids=[])],investigation='',recommendation='',measurement='',missing_information='',chart=dict(kind='none',result=0,x='',y=''))
+    notes=[dict(id='CTX1',event_type='annual_leave',start_date='2026-09-08',end_date='2026-09-09')]
+    with pytest.raises(QueryBlocked,match='temporary availability'):validate_commercial_labels(db,p,a,results,notes)
+    a.claims[0].context_ids=['CTX1']
+    validate_commercial_labels(db,p,a,results,notes)
+    a.claims[0].evidence[0].result=3
+    with pytest.raises(QueryBlocked,match='baseline_average'):validate_commercial_labels(db,p,a,results,notes)

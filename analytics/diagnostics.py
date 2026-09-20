@@ -72,7 +72,18 @@ def period_diagnostic(db,staff,start,end,old_start,old_end,divisor):
                 'difference':value-base if complete and value is not None and base is not None else None,
                 'percentage_change':(value-base)/base*100 if complete and value is not None and base else None,
                 'coverage':'available' if complete else 'insufficient baseline history'})
-    return current+previous+[packet(db.intake,'approved_period_comparison',rows,f'{start} to {end} versus {old_start} to {old_end}')]
+    current_mix={(r['staff_name'],r['service_id']):r for r in current[1]['rows']}
+    previous_mix={(r['staff_name'],r['service_id']):r for r in previous[1]['rows']}
+    mix=[]
+    for key in sorted(current_mix.keys()|previous_mix.keys()):
+        a,b=current_mix.get(key,{}),previous_mix.get(key,{})
+        actual=a.get('service_revenue_aud',0);baseline=b.get('service_revenue_aud',0)/divisor if complete else None
+        mix.append({'staff_name':key[0],'service_id':key[1],'service_name':(a or b)['service_name'],
+            'current_revenue_aud':actual,'baseline_average_revenue_aud':baseline,'baseline_divisor':divisor,
+            'difference_aud':actual-baseline if baseline is not None else None,'current_start':start,'current_end':end,
+            'baseline_start':old_start,'baseline_end':old_end})
+    scope=f'{start} to {end} versus {old_start} to {old_end}; baseline totals divided by {divisor}'
+    return current+previous+[packet(db.intake,'approved_service_mix_comparison',mix,scope),packet(db.intake,'approved_period_comparison',rows,scope)]
 
 def calendar_periods(intake):
     today=intake.asof.date();monday=today-timedelta(days=today.weekday());last=monday-timedelta(days=7)

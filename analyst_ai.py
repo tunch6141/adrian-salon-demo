@@ -6,7 +6,7 @@ from typing import Literal,Union
 from pydantic import BaseModel, Field
 from analyst_engine import RULES, QueryBlocked, reference_value, validate_chart, service_diagnostic, bind_claim_values, period_diagnostic
 
-ANSWER_RELEASE = '20 Sep 2026 · reasoning 10'
+ANSWER_RELEASE = '20 Sep 2026 · reasoning 11'
 
 class ContextDraft(BaseModel):
     entity: str
@@ -109,7 +109,7 @@ NEVER mentally sum table rows. Use the supplied calculated summary/difference ce
 bookable_hours means available capacity: say 'bookable hours', never 'booked hours'. Completed service hours are completed work, while future booked hours are scheduled work; keep these distinct.
 Do not grade an isolated utilisation percentage as efficient, poor or good without a recorded target or a fair comparison. Say what it measures. Unqueried cost/profit is not missing data: use 'profit was not calculated here' unless actual returned coverage proves unavailable costs.
 For a claim citing owner context, [[context0_start]] and [[context0_end]] insert the dates of the first ID in that claim's context_ids list; context1 refers to its second ID. Use these for note dates that differ from the analysis period. Describe note content as owner-reported, never as an independently verified cause. Avoid quoting numeric amounts from free-text notes as calculated facts.
-A measured service-category revenue difference is a valid financial explanation, not proof of customer or employee motivation. If the premise is false, correct it first. Compare all relevant categories; do not cherry-pick colouring when highlights offset it.
+When approved_service_mix_comparison is supplied, use its baseline_average_revenue_aud and difference_aud: raw prior multi-week mix totals are not a weekly baseline. Discuss relevant owner-reported leave/closure notes before suggesting operational changes. Temporary leave plus stable utilisation does not establish persistent spare capacity or justify lasting roster cuts. Inspect service mix, compatible future capacity and covered profit before recommending discounts; never assume a revenue decline establishes weak demand. A measured service-category revenue difference is a valid financial explanation, not proof of customer or employee motivation. If the premise is false, correct it first. Compare all relevant categories; do not cherry-pick colouring when highlights offset it.
 For multiple staff sharing x dates/services set chart.series='staff_name' so they get separate lines or grouped bars. Use chart.series='' when no grouping is required.
 You explain business query results. Answer first using at most four short factual claims, each with exact zero-based result/row/column references or context IDs supporting it.
 Keep numbers and entities faithful. Never say stable when value declined. State staff/salon scope and dates. Each claim's entire meaning must follow from its citations. Owner context must be attributed as owner-reported, never verified cause.
@@ -262,7 +262,7 @@ from contextvars import ContextVar
 ACTIVE_STATS=ContextVar('analyst_stage_timings',default=None)
 
 
-def validate_commercial_labels(db,plan,answer,results):
+def validate_commercial_labels(db,plan,answer,results,contexts=()):
     """Check availability and benchmark claims against the actual scoped data."""
     import re
     prose=' '.join([c.text for c in answer.claims]+[answer.investigation,answer.recommendation,answer.measurement,answer.missing_information])
@@ -272,6 +272,19 @@ def validate_commercial_labels(db,plan,answer,results):
         if re.search(r'\b(reasonably efficient|efficient use of|good utilisation|poor utilisation)\b',prose,re.I):
             raise QueryBlocked('An isolated utilisation percentage has no established efficiency benchmark. State the measured utilisation without grading it as good, poor or efficient.')
     scope=plan.trend or plan.revenue or plan.diagnostic
+    if scope:
+        required={c['id'] for c in contexts if any(word in str(c.get('event_type','')).lower() for word in ['leave','absence','closure'])
+            and c.get('start_date','')<=scope.end_date and c.get('end_date','')>=scope.start_date}
+        cited={i for c in answer.claims for i in c.context_ids}
+        if required-cited:
+            raise QueryBlocked('The answer omitted relevant owner-reported temporary availability context: '+', '.join(sorted(required-cited))+'. Explain those notes as owner-reported alongside the measured capacity; do not subtract leave twice or recommend lasting roster cuts based on this temporary period.')
+    if plan.diagnostic and plan.diagnostic.comparison_divisor>1:
+        for claim in answer.claims:
+            for ref in claim.evidence:
+                result=results[ref.result] if 0<=ref.result<len(results) else {}
+                row=result.get('rows',[])[ref.row] if 0<=ref.row<len(result.get('rows',[])) else {}
+                if result.get('table')=='approved_service_mix' and row.get('period_start')==plan.diagnostic.comparison_start_date:
+                    raise QueryBlocked('Use approved_service_mix_comparison baseline_average_revenue_aud and difference_aud for service mix comparisons. Raw prior multi-week service totals cannot be compared with one current week.')
     if scope and hasattr(db,'intake') and 'financial_lines' in db.frames:
         f=db.frames['financial_lines']
         selected=f[(f.posted_date>=scope.start_date)&(f.posted_date<=scope.end_date)]
@@ -493,7 +506,7 @@ For a context contribution, prepare draft with stated entity/dates/event_type/ex
             # core answer. Omit it rather than inventing a supporting reference.
             answer.claims=[c for c in answer.claims if c.evidence or c.context_ids]
             bound=answer.model_copy(deep=True)
-            validate_commercial_labels(db,plan,bound,results)
+            validate_commercial_labels(db,plan,bound,results,contexts)
             if bound.additional_queries:raise QueryBlocked('The answer requested unexecuted queries.')
             if not bound.claims:raise QueryBlocked('The explanation must include supported findings.')
             for claim in bound.claims:
@@ -520,7 +533,7 @@ For a context contribution, prepare draft with stated entity/dates/event_type/ex
         bound=review.revised_answer.model_copy(deep=True)
         bound.claims=[c for c in bound.claims if c.evidence or c.context_ids]
         try:
-            validate_commercial_labels(db,plan,bound,results)
+            validate_commercial_labels(db,plan,bound,results,contexts)
             if bound.additional_queries:raise QueryBlocked('The reviewed answer requested unexecuted queries.')
             if not bound.claims:raise QueryBlocked('No supported answer was supplied.')
             for claim in bound.claims:
