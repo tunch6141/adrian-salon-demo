@@ -163,7 +163,8 @@ def test_method_followup_uses_previous_scope_without_inventing_comparison(db):
     assert result['status']=='answered'
     scope=result['results'][0]['rows'][0]
     assert scope['current_days']==1 and scope['comparison_used'] is False
-    assert result['results'][1]['rows'][0]['service_revenue_aud']==420
+    assert len(result['results'])==1
+    assert 'did not use a weekly' in result['answer']['claims'][0]['text']
 
 def test_unqueried_costs_are_not_missing_and_utilisation_has_no_invented_target(db):
     from analyst_ai import validate_commercial_labels
