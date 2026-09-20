@@ -12,9 +12,13 @@ SOURCE=ROOT/'data/handoff_2026_09_18/raw'
 def load_snapshot(state=None, source=SOURCE):
     state=state if state is not None else {}
     intake=apply_sales(Intake(source,state.get('p1_decisions',[])),state.get('p1_sales',[]))
+    return enrich_snapshot(intake,state.get('p1_context',[]))
+
+
+def enrich_snapshot(intake, context=()):
     names={r['staff_id']:r['staff_name'] for r in intake.tables.get('staff',[])}
     rows=[]
-    for raw in intake.tables.get('business_context',[])+state.get('p1_context',[]):
+    for raw in intake.tables.get('business_context',[])+list(context):
         if raw.get('confirmed') is False:continue
         rows.append({'id':raw['context_id'],'entity':raw.get('entity') or names.get(raw.get('staff_id')) or ('Customer '+raw['customer_id'] if raw.get('customer_id') else 'Salon'),
                      'start_date':raw['period_start'],'end_date':raw['period_end'],'event_type':raw.get('event_type') or 'owner_report',

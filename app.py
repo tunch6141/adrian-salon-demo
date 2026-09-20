@@ -130,14 +130,11 @@ def main():
     </style>''', unsafe_allow_html=True)
     st.caption('ADRIAN’S SALON · BUSINESS INSIGHTS')
     st.title('Know what changed. Decide what to do.')
-    st.caption('Synthetic demo · Handoff specification 18 September 2026')
+    st.caption('Synthetic demo · Persistent data pipeline · 20 September 2026')
     view = st.radio('View', ['Ask your salon', 'Business evidence', 'Legacy demo'], horizontal=True)
     if view == 'Ask your salon':
         from analyst_ui import render
-        from analytics.runtime import load_snapshot
-        with st.spinner('Loading salon data…'):
-            salon_snapshot=load_snapshot(st.session_state)
-        render(salon_snapshot, setting)
+        render(None, setting)
         return
     if view == 'Business evidence':
         from analytics.dashboard import render

@@ -38,6 +38,10 @@ def render_sale(pending,owner):
         if changed:st.warning('The details changed. Review the sale again before confirming.')
         if st.button('Confirm missing sale',type='primary',disabled=changed,key='sale_confirm'):
             try:
-                st.session_state['p1_sales']=validate_sales(st.session_state.get('p1_sales',[])+[r])
+                from analytics.persistence import save_review
+                from .chat_ui import setting
+                import uuid
+                updated=validate_sales(st.session_state.get('p1_sales',[])+[r])
+                save_review(st.session_state,setting,{'sales':updated},owner,'manual_sale',pending.setdefault('event_id',str(uuid.uuid4())))
                 st.session_state['p1_pending']=None;st.session_state['p1_notice']=f'Sale recorded for {r["sale_date"]}. Select a revenue period containing that date to see the effect. Raw CSVs were not changed.';st.rerun()
             except ValueError as exc:st.error(str(exc))

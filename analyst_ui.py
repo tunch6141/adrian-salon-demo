@@ -81,6 +81,7 @@ def render_result(item):
     if item['results']:
         with st.expander('Evidence and calculations'):
             st.caption(item['plan']['scope'])
+            if item.get('dataset_version'):st.caption('Cleaned data version: '+item['dataset_version'])
             for i,result in enumerate(item['results']):
                 st.write(f'Result {i} · {result["table"]} · {result["row_count"]} rows')
                 st.dataframe(pd.DataFrame(result['rows']),hide_index=True)
@@ -136,13 +137,24 @@ def context_form(store):
 
 def render(t,setting):
     st.subheader('Ask your salon')
-    st.caption('Version 5 · Handoff 18 September · Shared corrected data')
+    st.caption('Version 6 · Saved cleaned data and approval history')
     key,model,password=setting('OPENAI_API_KEY'),setting('OPENAI_MODEL'),setting('DEMO_PASSWORD')
     if not (key and model and password):
         st.info('Add OPENAI_API_KEY, OPENAI_MODEL and DEMO_PASSWORD in Streamlit Secrets.');return
     entered=st.text_input('Demo password',type='password',key='v4_password')
     if not hmac.compare_digest(entered.encode(),password.encode()):
         st.caption('Enter the demo password to continue.');return
+    if t is None:
+        from analytics.persistence import load_active
+        try:
+            with st.spinner('Loading saved salon data…'):
+                t=load_active(st.session_state,setting)
+        except ValueError as exc:
+            st.error(str(exc));return
+    if getattr(t,'version_id',None):
+        st.caption(f"Using saved cleaned version {t.version_id[:8]} · {len(t.issues)} unresolved data issues")
+    else:
+        st.info('Local preview: Supabase data storage is not connected.')
     rows=st.session_state.setdefault('context_rows',[])
     store=ContextStore(setting('SUPABASE_URL'),setting('SUPABASE_SERVICE_ROLE_KEY'),rows)
     if hasattr(t,'tables'):
@@ -174,6 +186,7 @@ def render(t,setting):
                 history=[{'question':x['question'],'plan':x['result']['plan'],'answer':x['result']['answer'],'status':x['result']['status']} for x in turns[-5:]]
                 # History is only interpretation context; each answer retrieves fresh database evidence.
                 result=investigate(OpenAI(api_key=key,timeout=60,max_retries=0),model,db,question.strip(),history,store,on_stage=lambda stage: progress.update(label=stage))
+                result['dataset_version']=getattr(t,'version_id',t.revision)
                 st.session_state.v4_turns=(turns+[{'question':question.strip(),'result':result}])[-10:]
                 if result['status']=='context' and result['plan']['draft']:
                     st.session_state.context_draft=result['plan']['draft']

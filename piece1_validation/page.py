@@ -11,7 +11,7 @@ from .metrics import revenue
 def render():
     st.set_page_config(page_title='Piece 1 | Data validation',layout='wide')
     st.title('Piece 1 — Data validation')
-    st.caption('Build P1-UI-4 · Expanded 18 September dataset · Shared with the analyst')
+    st.caption('Build P1-UI-5 · Persistent approval pipeline · Shared with the analyst')
     try:password=str(st.secrets.get('DEMO_PASSWORD',os.environ.get('DEMO_PASSWORD','')))
     except (FileNotFoundError,KeyError):password=os.environ.get('DEMO_PASSWORD','')
     if not password:
@@ -22,13 +22,17 @@ def render():
         st.caption('Enter your existing demo password to continue.');return
     st.write('Review the cleaned data and revenue calculations shared with the analyst.')
     from analytics.runtime import load_snapshot, SOURCE
+    from analytics.persistence import load_active
+    from .chat_ui import setting
     try:
         with st.spinner('Loading and validating salon data…'):
-            intake=load_snapshot(st.session_state)
-            baseline=load_snapshot()
+            intake=load_active(st.session_state,setting)
+            baseline=load_snapshot(source=intake.source)
     except Exception as exc:
         st.error(f'Validation data could not load: {type(exc).__name__}: {exc}')
         st.info('Check that the entire piece1_validation folder was uploaded beside app.py.');return
+    from .pipeline_ui import render_pipeline
+    render_pipeline(intake,setting)
     st.caption(f'Reporting clock: {intake.asof.isoformat()} · {intake.zone.key}')
     person=st.selectbox('Revenue scope',['Sarah','Matthew','Sam','Whole business'])
     staff={'Sarah':'S01','Matthew':'S02','Sam':'S03','Whole business':None}[person]
@@ -85,7 +89,8 @@ def render():
         with tempfile.TemporaryDirectory(prefix='piece1_check_') as tmp:
             import sqlite3
             db=Path(tmp)/'check.sqlite';intake.save(db);intake.save(db)
-            with sqlite3.connect(db) as con:count=con.execute('SELECT COUNT(*) FROM batches').fetchone()[0]
+            from contextlib import closing
+            with closing(sqlite3.connect(db)) as con:count=con.execute('SELECT COUNT(*) FROM batches').fetchone()[0]
         check('Identical imports do not create duplicate snapshots',count==1)
         st.session_state['piece1_check_results']=checks
         intake=current_intake
@@ -94,4 +99,4 @@ def render():
         if all(c['Result']=='PASS' for c in checks):st.success(f"All {len(checks)} deployment checks passed.")
         else:st.error('Some checks failed. Download the report before proceeding.')
     st.download_button('Download validation report',json.dumps({'build':'P1-UI-4','intake':intake.report(),'revenue':result,'deployment_checks':st.session_state.get('piece1_check_results',[]),'scope':'Data intake and revenue only. Live AI, booking capacity and permanent cloud storage are not tested.'},indent=2),file_name='piece1_validation_report.json',mime='application/json')
-    st.info('Ask your salon and Business evidence now use these same corrected records. Corrections and manual sales are session-only until exported. Context notes change explanations, not figures.')
+    st.info('Ask your salon and Business evidence now use these same corrected records. When Supabase is connected, confirmed corrections and sales are saved with an approval trail. Context notes change explanations, not figures.')

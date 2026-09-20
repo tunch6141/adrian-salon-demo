@@ -3,7 +3,8 @@ from pathlib import Path
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
-import csv, hashlib, json, re, sqlite3, uuid
+from contextlib import closing
+import csv, hashlib, io, json, re, sqlite3, uuid
 
 from analytics.contracts import EXTENSION_KEYS
 
@@ -44,22 +45,26 @@ def timestamp(value, zone="Australia/Melbourne"):
 
 class Intake:
     def __init__(self,source,decisions=()):
-        self.source=Path(source);self.tables={};self.issues=[];self.audit=[];self.lineage=[];self.raw=[];self.headers={};self.identity=[]
+        self.source=source if isinstance(source,dict) else Path(source)
+        self.tables={};self.issues=[];self.audit=[];self.lineage=[];self.raw=[];self.headers={};self.identity=[]
+        def csv_text(table):
+            if isinstance(self.source,dict):return self.source['tables'].get(table)
+            path=self.source/(table+'.csv')
+            return path.read_bytes().decode('utf-8-sig') if path.exists() else None
         self.zone='Australia/Melbourne'
-        business_path=self.source/'businesses.csv'
-        if business_path.exists():
-            with business_path.open(encoding='utf-8-sig') as f:
-                business=next(csv.DictReader(f),{})
-                self.zone=business.get('timezone') or self.zone
-                ZoneInfo(self.zone)
+        business_text=csv_text('businesses')
+        if business_text is not None:
+            business=next(csv.DictReader(io.StringIO(business_text.lstrip('\ufeff'))),{})
+            self.zone=business.get('timezone') or self.zone
+            ZoneInfo(self.zone)
         self.decisions=list(decisions)
         for d in self.decisions:
             if not all(d.get(k) for k in ['table','field','raw_value','approved_by','approved_at','reason']):raise ValueError('Every decision requires scope, approver, time and reason')
             timestamp(d['approved_at'])
         for table,fields in SCHEMA.items():
-            path=self.source/(table+'.csv')
-            if not path.exists():continue
-            with path.open(encoding='utf-8-sig',newline='') as f:
+            text=csv_text(table)
+            if text is None:continue
+            with io.StringIO(text.lstrip('\ufeff'),newline='') as f:
                 reader=csv.DictReader(f);rows=list(reader);self.headers[table]=reader.fieldnames or []
             self.tables[table]=[];seen={};blocked=set()
             for n,raw in enumerate(rows,2):
@@ -79,7 +84,7 @@ class Intake:
                 clean={}
                 for field,kind in fields.items():
                     original=raw.get(field);value=original
-                    decision=next((d for d in reversed(self.decisions) if d['table']==table and d['field']==field and str(d['raw_value'])==str(original) and (not d.get('record_id') or d['record_id']==key)),None)
+                    decision=next((d for d in reversed(self.decisions) if d['table']==table and d['field']==field and (str(d['raw_value']).strip().casefold()==str(original).strip().casefold() if table=='bookings' and field=='staff_id' else str(d['raw_value'])==str(original)) and (not d.get('record_id') or d['record_id']==key)),None)
                     if decision:
                         value=decision.get('value');self.log(table,n,field,original,value,'owner_approved',decision['reason'],decision)
                     try:
@@ -92,7 +97,7 @@ class Intake:
                         if str(value).lower()!=str(original).lower() or (field=='email' and value!=original):
                             self.log(table,n,field,original,value,'safe_normalisation','Approved fixture adapter rule')
                 self.tables[table].append(clean)
-                self.lineage.append({'table':table,'record_id':key,'source_file':path.name,'source_row':n,'raw_sha256':digest(raw)})
+                self.lineage.append({'table':table,'record_id':key,'source_file':table+'.csv','source_row':n,'raw_sha256':digest(raw)})
             self.tables[table]=[r for r in self.tables[table] if str(r[keyfield]) not in blocked]
         business_ids={r.get('business_id') for t,rows in self.tables.items() for r in rows if r.get('business_id')}
         if business_ids != {'B001'}:raise ValueError('This adapter supports the B001 fixture only; cross-business intake rejected')
@@ -205,7 +210,7 @@ class Intake:
     def save(self,path):
         """Append immutable snapshots and audit events. Identical imports are idempotent."""
         path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
-        with sqlite3.connect(path) as con:
+        with closing(sqlite3.connect(path)) as con, con:
             con.executescript('''CREATE TABLE IF NOT EXISTS batches(batch_id TEXT PRIMARY KEY, imported_at TEXT, payload TEXT);
               CREATE TABLE IF NOT EXISTS raw_rows(batch_id TEXT, source_table TEXT, source_row INTEGER, payload TEXT, PRIMARY KEY(batch_id,source_table,source_row));
               CREATE TABLE IF NOT EXISTS audit_events(event_id TEXT PRIMARY KEY, batch_id TEXT, payload TEXT);

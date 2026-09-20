@@ -2,7 +2,7 @@
 import hmac
 from datetime import date,timedelta
 import streamlit as st
-from .runtime import load_snapshot
+from .persistence import load_active
 from .calculations import staff_summary,pricing_simulation
 from .views import build_views
 
@@ -11,8 +11,11 @@ def render(setting):
     if not password:st.info('Set DEMO_PASSWORD in Streamlit Secrets.');return
     entered=st.text_input('Demo password',type='password',key='evidence_password')
     if not hmac.compare_digest(entered.encode(),password.encode()):return
-    with st.spinner('Loading salon data…'):
-        intake=load_snapshot(st.session_state)
+    try:
+        with st.spinner('Loading salon data…'):
+            intake=load_active(st.session_state,setting)
+    except ValueError as exc:
+        st.error(str(exc));return
     st.subheader('Business evidence')
     st.caption(f'Synthetic data · As at {intake.asof:%d %B %Y %H:%M %Z} · Revenue excludes GST. Receivables show their source tax basis.')
     start=st.date_input('From',value=date(2026,9,7),key='evidence_start')

@@ -5,7 +5,8 @@ import uuid
 
 import streamlit as st
 
-from .adapter import Intake
+from .adapter import Intake, digest
+from analytics.persistence import save_review
 from .amendments import money_request, validate_sales
 from .clarification import (
     questions,
@@ -46,8 +47,9 @@ def render_chat(intake):
 
     st.subheader("Clarify an issue with the owner")
     st.caption(
-        "Confirmed changes apply in this session. Download a checkpoint "
-        "before leaving. Permanent database storage is not connected."
+        "Confirmed decisions are remembered and reused. New ambiguities need review. "
+        "The approval history records who confirmed each change and when." if st.session_state.get("pipeline_connected") else
+        "Local preview only. Download a checkpoint before leaving; Supabase is not connected."
     )
 
     choices = {q["id"]: q for q in questions(intake)}
@@ -267,7 +269,7 @@ def render_chat(intake):
             )
             st.caption(
                 "Raw source files remain unchanged. The approved decision "
-                "is reusable through the checkpoint."
+                "is reused automatically on matching future imports."
             )
 
             if st.button(
@@ -277,13 +279,19 @@ def render_chat(intake):
             ):
                 try:
                     updated = st.session_state["p1_decisions"] + [
-                        decision(pending["draft"], owner)
+                        pending.setdefault("approved_decision", decision(pending["draft"], owner))
                     ]
 
-                    # Validate the proposed decision by reprocessing first.
+                    approved = updated[-1]
+                    approved.setdefault("rule_id", str(uuid.uuid4()))
+                    if approved.get("record_id"):
+                        from .adapter import KEYS
+                        source_row = next((r['record'] for r in intake.raw if r['table']==approved['table'] and
+                            r['record'].get(KEYS[approved['table']])==approved['record_id']), {})
+                        approved.setdefault("source_row_hash", digest(source_row))
                     Intake(raw, updated)
-
-                    st.session_state["p1_decisions"] = updated
+                    save_review(st.session_state, setting, {"decisions":updated}, owner,
+                                "correction", pending.setdefault("event_id",str(uuid.uuid4())))
                     st.session_state["p1_pending"] = None
                     st.session_state.pop("piece1_check_results", None)
                     st.session_state["p1_notice"] = (
@@ -329,10 +337,12 @@ def render_chat(intake):
                     note = context_note(
                         pending["text"], entity, start, end, owner
                     )
-                    st.session_state["p1_context"].append(note)
+                    note = pending.setdefault("approved_note", note)
+                    save_review(st.session_state, setting, {"context":st.session_state["p1_context"]+[note]},
+                                owner,"context",pending.setdefault("event_id",str(uuid.uuid4())))
                     st.session_state["p1_pending"] = None
                     st.session_state["p1_notice"] = (
-                        "Owner context recorded for this session. "
+                        "Owner context recorded. "
                         "No analytical figures changed."
                     )
                     st.rerun()
@@ -375,7 +385,7 @@ def render_chat(intake):
         st.caption(
             "Business context preserves the owner's explanation. "
             "Ask your salon can retrieve these notes for the relevant "
-            "entity and dates in this session."
+            "entity and dates."
         )
 
     st.download_button(
@@ -411,17 +421,19 @@ def render_chat(intake):
                 )
 
                 st.caption(
-                    "Restoring replaces this session's decisions, notes "
-                    "and manual sales. Review them first."
+                    "Restoring adds reviewed decisions, notes and sales while preserving earlier approval history. Enter your name above and review first."
                 )
 
                 if st.button(
                     "Restore reviewed checkpoint",
                     key="p1_restore_confirm",
                 ):
-                    st.session_state["p1_decisions"] = decisions
-                    st.session_state["p1_context"] = notes
-                    st.session_state["p1_sales"] = sales
+                    updates = {}
+                    for name, incoming in [("decisions",decisions),("context",notes),("sales",sales)]:
+                        existing = st.session_state["p1_"+name]
+                        updates[name] = existing+[row for row in incoming if row not in existing]
+                    save_review(st.session_state,setting,updates,owner,"checkpoint_restore",
+                                str(uuid.uuid5(uuid.NAMESPACE_URL,json.dumps(updates,sort_keys=True)+str(st.session_state.get("pipeline_version")))))
                     st.session_state["p1_pending"] = None
                     st.session_state["p1_chat"] = {}
                     st.session_state.pop("piece1_check_results", None)
