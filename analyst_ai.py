@@ -6,7 +6,7 @@ from typing import Literal,Union
 from pydantic import BaseModel, Field
 from analyst_engine import RULES, QueryBlocked, reference_value, validate_chart, service_diagnostic, bind_claim_values, period_diagnostic
 
-ANSWER_RELEASE = '20 Sep 2026 · reasoning 22.2'
+ANSWER_RELEASE = '20 Sep 2026 · reasoning 22.3'
 
 class CustomerRequest(BaseModel):
     identifier: str = Field(description='Exact cleaned customer ID or name; resolve omitted identity from the previous booking result')

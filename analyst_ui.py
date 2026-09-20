@@ -47,6 +47,26 @@ def result_chart(item):
     return None
 
 
+def verified_trend_summary(item):
+    scope=item.get('plan',{}).get('trend')
+    if not scope:return []
+    label={'service':'service','product':'retail','part':'part','all':'total net'}[scope['category']]
+    summaries=[]
+    for result in item.get('results',[]):
+        if result['table']!='approved_trend_totals':continue
+        for row in result['rows']:
+            text=f"{row['staff_name']}: {label} revenue totalled AUD {row['net_revenue_aud']:,.2f} from {scope['start_date']} to {scope['end_date']}."
+            low,high=row.get('minimum_complete_bucket_revenue'),row.get('maximum_complete_bucket_revenue')
+            if low is not None and high is not None:text+=f" Complete {scope['grain']} periods ranged from AUD {low:,.2f} to AUD {high:,.2f}."
+            delta=row.get('last_minus_first_complete_bucket')
+            if delta is not None:text+=f" Change from the first to last complete {scope['grain']}: AUD {delta:+,.2f}."
+            pattern=row.get('complete_bucket_pattern')
+            if pattern=='fluctuating':text+=' The complete periods fluctuated.'
+            elif pattern=='nondecreasing':text+=' Revenue did not decrease between the complete periods.'
+            summaries.append(text)
+    return summaries
+
+
 def diagnostic_facts(item):
     """Present approved module values directly; the model explains their meaning."""
     diagnostic=item.get('plan',{}).get('diagnostic')
@@ -94,6 +114,7 @@ def render_result(item):
         st.info('The app retrieved data but could not verify its written explanation. That does not mean your business question is unanswerable. The tables contain the retrieved figures; the explanation was withheld to avoid presenting an unchecked claim.')
     elif status=='facts_only':
         st.info('The investigation could not complete all its checks. Showing the verified results retrieved so far.')
+        for line in verified_trend_summary(item):safe_text(line)
         for result in item['results']:
             if result['table']=='approved_period_comparison':
                 for row in result['rows']:

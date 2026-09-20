@@ -346,6 +346,15 @@ def bind_claim_values(results,claim,periods,contexts=()):
     for key,day in dates.items():
         for month in {day.strftime('%B'),day.strftime('%b')}:
             text=re.sub(r'\b('+month+r')\s+'+str(day.year)+r'\b',r'\1 [['+key+'_year]]',text,flags=re.I)
+    # A month within a verified multi-month scope is a valid period label too,
+    # not an invented numeric amount (e.g. June 2026 inside May-August 2026).
+    if 'start' in dates and 'end' in dates:
+        month=dates['start'].replace(day=1)
+        while month<=dates['end']:
+            key=f'period_year_{month.year}';slots[key]=str(month.year)
+            for name in {month.strftime('%B'),month.strftime('%b')}:
+                text=re.sub(r'\b('+name+r')\s+'+str(month.year)+r'\b',r'\1 [['+key+']]',text,flags=re.I)
+            month=date(month.year+1,1,1) if month.month==12 else date(month.year,month.month+1,1)
     for key,value in slots.items():
         if not key.endswith('_time'):continue
         clock=datetime.strptime(value,'%H:%M')

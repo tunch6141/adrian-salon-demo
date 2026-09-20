@@ -61,6 +61,17 @@ def test_leave_counts_and_capacity_labels():
     with pytest.raises(QueryBlocked,match='available capacity'):validate_commercial_labels(None,plan(),answer,[],[])
 
 
+def test_intermediate_month_label_and_verified_trend_summary():
+    from analyst_engine import bind_claim_values
+    from analyst_ui import verified_trend_summary
+    rows=[{'rows':[{'revenue':100}]}]
+    claim=dict(text='In June 2026, service revenue was [[0]].',evidence=[dict(result=0,row=0,column='revenue',format='money')])
+    assert bind_claim_values(rows,claim,['2026-05-01','2026-08-31'])=='In June 2026, service revenue was AUD 100.00.'
+    item=dict(plan=dict(trend=dict(category='service',start_date='2026-05-01',end_date='2026-08-31',grain='month')),results=[dict(table='approved_trend_totals',rows=[dict(staff_name='Sarah',net_revenue_aud=1000,minimum_complete_bucket_revenue=100,maximum_complete_bucket_revenue=400,last_minus_first_complete_bucket=300,complete_bucket_pattern='nondecreasing')])])
+    text=verified_trend_summary(item)[0]
+    assert 'AUD 1,000.00' in text and 'AUD +300.00' in text and 'did not decrease' in text
+
+
 def test_source_context_correction_retraction_and_history_preserve_raw():
     intake=load_snapshot();original=deepcopy(intake.contexts)
     backing=ContextStore();store=CombinedContextStore(intake,backing)
