@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 from analyst_engine import Database, QueryBlocked
-from analyst_ai import investigate
+from analyst_ai import investigate, ANSWER_RELEASE
 from business_context import ContextStore
 
 
@@ -96,6 +96,7 @@ def render_result(item):
         with st.expander('Evidence and calculations'):
             st.caption(item['plan']['scope'])
             if item.get('dataset_version'):st.caption('Cleaned data version: '+item['dataset_version'])
+            if item.get('answer_release'):st.caption('Answer release: '+item['answer_release'])
             for i,result in enumerate(item['results']):
                 st.write(f'Result {i} · {result["table"]} · {result["row_count"]} rows')
                 st.dataframe(pd.DataFrame(result['rows']),hide_index=True)
@@ -152,7 +153,7 @@ def context_form(store):
 
 def render(t,setting):
     st.subheader('Ask your salon')
-    st.caption('Version 7 · Cleaned-data answers and commercial diagnostics')
+    st.caption('Cleaned-data answers and commercial diagnostics · '+ANSWER_RELEASE)
     key,model,password=setting('OPENAI_API_KEY'),setting('OPENAI_MODEL'),setting('DEMO_PASSWORD')
     if not (key and model and password):
         st.info('Add OPENAI_API_KEY, OPENAI_MODEL and DEMO_PASSWORD in Streamlit Secrets.');return

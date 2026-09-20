@@ -6,6 +6,8 @@ from typing import Literal,Union
 from pydantic import BaseModel, Field
 from analyst_engine import RULES, QueryBlocked, reference_value, validate_chart, service_diagnostic, bind_claim_values, period_diagnostic
 
+ANSWER_RELEASE = '20 Sep 2026 · reasoning 8'
+
 class ContextDraft(BaseModel):
     entity: str
     start_date: str
@@ -232,6 +234,7 @@ def investigate(client,model,db,question,history,context_store,on_stage=None):
     try:
         result=_investigate(client,model,db,question,history,context_store,on_stage or (lambda stage:None))
         result['timing']={'total_seconds':round(time.monotonic()-started,2),'calls':stats}
+        result['answer_release']=ANSWER_RELEASE
         return result
     finally:ACTIVE_STATS.reset(token)
 
