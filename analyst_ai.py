@@ -2,7 +2,7 @@
 import json
 import sqlite3
 from sqlglot.errors import SqlglotError
-from typing import Literal
+from typing import Literal,Union
 from pydantic import BaseModel, Field
 from analyst_engine import RULES, QueryBlocked, reference_value, validate_chart, service_diagnostic, bind_claim_values, period_diagnostic
 
@@ -145,7 +145,16 @@ def structured(client,model,schema,instructions,payload):
         ids=tuple(c['id'] for c in payload.get('contexts',[]))
         context_type=list[Literal[ids]] if ids else list[str]
         context_field=Field(default_factory=list) if ids else Field(default_factory=list,max_length=0)
-        claim_type=create_model('EvidenceClaim',__base__=Claim,context_ids=(context_type,context_field))
+        citations=[]
+        for i,result in enumerate(payload.get('results',[])):
+            if not result['rows']:continue
+            columns=tuple(dict.fromkeys(k for row in result['rows'] for k in row))
+            citations.append(create_model(f'Result{i}Citation',__base__=Citation,
+                result=(Literal[i],...),row=(int,Field(ge=0,le=len(result['rows'])-1)),column=(Literal[columns],...)))
+        citation_type=Union[tuple(citations)] if len(citations)>1 else citations[0] if citations else Citation
+        evidence_field=Field(default_factory=list) if citations else Field(default_factory=list,max_length=0)
+        claim_type=create_model('EvidenceClaim',__base__=Claim,context_ids=(context_type,context_field),
+            evidence=(list[citation_type],evidence_field))
         answer_type=create_model('Answer',__base__=Answer,claims=(list[claim_type],Field(max_length=4)))
         schema=answer_type if schema is Answer else create_model('Review',__base__=Review,revised_answer=(answer_type|None,None))
     started=time.monotonic()

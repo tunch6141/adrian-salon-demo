@@ -58,6 +58,11 @@ def render_result(item):
         st.warning('The evidence check did not approve an answer. I have withheld the explanation; you can inspect the query results below or ask a narrower question.')
     else:
         a=item['answer']
+        if item['plan'].get('booking_id'):
+            for result in item['results']:
+                for row in result['rows']:
+                    if row.get('id_match')=='unique match ignoring leading zero padding':
+                        st.caption(f"Matched {row['requested_booking_id']} to booking {row['booking_id']} by its unique number.")
         for claim in a['claims']:
             safe_text(claim['text'])
         if item['plan'].get('trend'):

@@ -244,6 +244,16 @@ def bind_claim_values(results,claim,periods,contexts=()):
     from datetime import date,datetime
     slots=dict(zip(('start','end'),periods))
     pairs=[('start','end')]
+    # The requested short ID is an echo of the owner's question, not an invented
+    # numeric fact. Only the approved unique-ID resolver can establish this alias.
+    for i,result in enumerate(results):
+        if result.get('table')!='booking_records' or result.get('evidence_level')!='deterministic_calculation':continue
+        for n,row in enumerate(result['rows']):
+            if row.get('id_match')!='unique match ignoring leading zero padding':continue
+            if not any(ref['result']==i and ref['row']==n for ref in refs):continue
+            requested,canonical=row['requested_booking_id'],row['booking_id']
+            key=f'booking_alias{i}_{n}';slots[key]=canonical
+            text=re.sub(r'\b'+re.escape(requested)+r'\b','[['+key+']]',text,flags=re.I)
     # Date/time components are derived only from explicitly cited date cells.
     for i,ref in enumerate(refs):
         value=reference_value(results,ref)

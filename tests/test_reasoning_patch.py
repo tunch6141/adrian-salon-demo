@@ -28,6 +28,8 @@ def test_booking_uses_corrected_record_and_unique_short_identifier(db):
     assert booking_lookup(db,'B00004')[0]['rows'][0]['id_match']=='exact'
     assert booking_lookup(db,'B999999')[0]['rows']==[]
     assert db.intake.tables==before
+    claim=dict(text='The booking record for B0004 is completed.',evidence=[dict(result=0,row=0,column='status')])
+    assert bind_claim_values(booking_lookup(db,'B0004'),claim,['',''])=='The booking record for B00004 is completed.'
     assert db.query("SELECT * FROM booking_records WHERE booking_id='B00004'")['rows'][0]['staff_name']=='Sarah'
     with pytest.raises(QueryBlocked):db.query('DELETE FROM booking_records')
 
@@ -115,11 +117,14 @@ def test_live_output_schema_cannot_invent_context_references():
     client=MagicMock()
     sample=dict(claims=[dict(text='Revenue [[0]].',evidence=[dict(result=0,row=0,column='amount')],context_ids=[])],investigation='',recommendation='',measurement='',missing_information='',chart=dict(kind='none',result=0,x='',y=''))
     for contexts in [[],[dict(id='CTX1')]]:
-        structured(client,'gpt-4.1-mini',Answer,'test',{'contexts':contexts})
+        structured(client,'gpt-4.1-mini',Answer,'test',{'contexts':contexts,'results':[{'rows':[{'amount':420}]}]})
         schema=client.responses.parse.call_args.kwargs['text_format']
         schema.model_validate(sample)
         invalid=deepcopy(sample);invalid['claims'][0]['context_ids']=['invented']
         with pytest.raises(ValidationError):schema.model_validate(invalid)
+        for change in [dict(column='missing'),dict(result=1),dict(row=1)]:
+            invalid=deepcopy(sample);invalid['claims'][0]['evidence'][0].update(change)
+            with pytest.raises(ValidationError):schema.model_validate(invalid)
         if contexts:
             valid=deepcopy(sample);valid['claims'][0]['context_ids']=['CTX1'];schema.model_validate(valid)
 
