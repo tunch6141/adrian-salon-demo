@@ -89,6 +89,15 @@ def render_result(item):
             if a[key]:
                 with st.expander(label):safe_text(a[key])
         if a['missing_information']:st.info(a['missing_information'])
+        if a.get('context_review'):
+            notes={c['id']:c for c in item.get('contexts',[])}
+            with st.expander('How business context was considered'):
+                for review in a['context_review']:
+                    note=notes.get(review.get('context_id'))
+                    if note:
+                        st.caption(f"Owner-reported · {note['entity']} · {note['start_date']} to {note['end_date']}")
+                        safe_text(note['explanation'])
+                        safe_text(review.get('interpretation',''))
     if item.get('timing'):
         timing=item['timing']
         st.caption(f"Completed in {timing['total_seconds']:.1f}s · {len(timing['calls'])} AI calls")

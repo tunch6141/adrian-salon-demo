@@ -6,7 +6,7 @@ from typing import Literal,Union
 from pydantic import BaseModel, Field
 from analyst_engine import RULES, QueryBlocked, reference_value, validate_chart, service_diagnostic, bind_claim_values, period_diagnostic
 
-ANSWER_RELEASE = '20 Sep 2026 · reasoning 13'
+ANSWER_RELEASE = '20 Sep 2026 Â· reasoning 14'
 
 class ContextDraft(BaseModel):
     entity: str
@@ -66,6 +66,11 @@ class Chart(BaseModel):
     y: str
     series: str = ""
 
+class ContextAssessment(BaseModel):
+    context_id: str
+    relevance: Literal['relevant','not_relevant','conflicting']
+    interpretation: str
+
 class Answer(BaseModel):
     additional_queries: list[str] = Field(default_factory=list, max_length=3)
     claims: list[Claim] = Field(max_length=4)
@@ -74,6 +79,7 @@ class Answer(BaseModel):
     measurement: str
     missing_information: str
     chart: Chart
+    context_review: list[ContextAssessment] = Field(default_factory=list)
 
 class Review(BaseModel):
     approved: bool
@@ -114,7 +120,7 @@ For multiple staff sharing x dates/services set chart.series='staff_name' so the
 You explain business query results. Answer first using at most four short factual claims, each with exact zero-based result/row/column references or context IDs supporting it.
 Keep numbers and entities faithful. Never say stable when value declined. State staff/salon scope and dates. Each claim's entire meaning must follow from its citations. Owner context must be attributed as owner-reported, never verified cause.
 Do not invent numbers, causality, benchmarks, source details or actions taken. No general-knowledge answers. All text must be grounded in returned results, approved rules or retrieved context.
-For lookup/followup: normally 1–2 claims and no investigation/recommendation/measurement unless requested. For analysis use a short investigation and chart if useful. For action focus recommendation on the observed evidence; suggestions are not established results. Do not manufacture a recommendation merely to fill a section. Empty string means omit section.
+For lookup/followup: normally 1â€“2 claims and no investigation/recommendation/measurement unless requested. For analysis use a short investigation and chart if useful. For action focus recommendation on the observed evidence; suggestions are not established results. Do not manufacture a recommendation merely to fill a section. Empty string means omit section.
 For a simple result or trend, the application displays the FULL table automatically. State the main answer and a useful implication, not every row. Booking IDs and timestamps contain digits: cite those string cells with [[0]] just like numeric cells. Use [[start]]/[[end]] for analysis dates; do not repeat a literal year. Do not invent a numeric total or difference that is not a returned cell. Put uncited limitations (such as unavailable causal evidence) in missing_information, not a separate factual claim with empty citations. Mention relevant retrieved owner context with context_ids; absence of a context note is not evidence of no event. A previous day-versus-week comparison is invalid: acknowledge the mismatch and explain the corrected scope, using current returned figures only.
 For revenue trends use approved_trend_totals for the total, minimum/maximum COMPLETE bucket, and first/last change. Never infer extrema by skimming rows or use clipped edge buckets as complete weeks. A request to show a trend needs no recommendation or profit discussion. Optional diagnostics NOT QUERIED are different from data UNAVAILABLE: never say costs/service mix/context do not exist merely because they were unnecessary for this answer. The supplied schema and graph show what can be investigated.
 Charts reference existing result columns only, never supply invented chart values. Choose none if chart isn't useful. Line for time, bar for comparison, pie only composition.
@@ -156,7 +162,9 @@ def decode_answer_parts(wire):
                 if part['context_id'] not in ids:ids.append(part['context_id'])
                 text.append('[[context'+str(ids.index(part['context_id']))+'_'+('start' if part['field']=='start_date' else 'end')+']]')
         claims.append(dict(text=''.join(text),evidence=refs,context_ids=ids))
-    return Answer(**{**data,'claims':claims})
+    reviewed=data.get('context_review',[])
+    if isinstance(reviewed,dict):reviewed=list(reviewed.values())
+    return Answer(**{**data,'claims':claims,'context_review':reviewed})
 
 
 def canonical_trend_request(queries):
@@ -266,9 +274,19 @@ def structured(client,model,schema,instructions,payload):
         part_type=Union[tuple(parts)] if len(parts)>1 else parts[0]
         claim_type=create_model('EvidenceClaim',parts=(list[part_type],Field(min_length=1,max_length=40)),
             context_ids=(context_type,context_field),evidence=(list[citation_type],evidence_field))
-        answer_type=create_model('Answer',__base__=Answer,claims=(list[claim_type],Field(max_length=4)))
+        context_fields={}
+        if ids:
+            for i,identifier in enumerate(ids):
+                assessment=create_model(f'ContextAssessment{i}',context_id=(Literal[identifier],...),
+                    relevance=(Literal['relevant','not_relevant','conflicting'],...),
+                    interpretation=(str,Field(description='Explain how this OWNER-REPORTED note affects the interpretation or proposed action. It cannot alter calculated facts or establish causation.')))
+                context_fields[f'note_{i}']=(assessment,...)
+            context_review=create_model('RequiredContextReview',**context_fields)
+            answer_type=create_model('Answer',__base__=Answer,claims=(list[claim_type],Field(max_length=4)),context_review=(context_review,...))
+        else:
+            answer_type=create_model('Answer',__base__=Answer,claims=(list[claim_type],Field(max_length=4)),context_review=(list[ContextAssessment],Field(default_factory=list,max_length=0)))
         schema=answer_type if schema is Answer else create_model('Review',__base__=Review,revised_answer=(answer_type|None,None))
-        instructions+='''\nRESPONSE FORMAT OVERRIDE: The output schema uses claim.parts, not manually numbered placeholders. Build each sentence as a sequence of text parts and value parts. A value part contains its DIRECT citation (result, row, column, format); the application inserts that entire value. A period part inserts start/end ISO date or the analysis year. A context_date part inserts the date from the specified actual note. Never type [[0]] or other placeholders yourself. Example parts: text "Phone accounted for ", value citation to completed_booking_count, text " completed bookings." For "In August [year]", use text "In August ", period field year, text ", ...". Include ordinary spaces in text parts. Additional evidence citations support qualitative statements; do not display a cell unrelated to its sentence. Do not prefix letters/month words already contained in an inserted value. When reviewing a rendered answer, any revised_answer must use this same parts format. All earlier evidence and commercial rules still apply; this override only changes how sentences link to their source values.'''
+        instructions+='''\nCONTEXT REVIEW IS REQUIRED: Assess every supplied context note in context_review before giving advice. Explain its relevance or conflict, preserve it as owner-reported, and reflect temporary availability in recommendations. Do not propose lasting roster reductions from a leave-affected week. Reviewer: inspect these assessments and the recommendations together. RESPONSE FORMAT OVERRIDE: The output schema uses claim.parts, not manually numbered placeholders. Build each sentence as a sequence of text parts and value parts. A value part contains its DIRECT citation (result, row, column, format); the application inserts that entire value. A period part inserts start/end ISO date or the analysis year. A context_date part inserts the date from the specified actual note. Never type [[0]] or other placeholders yourself. Example parts: text "Phone accounted for ", value citation to completed_booking_count, text " completed bookings." For "In August [year]", use text "In August ", period field year, text ", ...". Include ordinary spaces in text parts. Additional evidence citations support qualitative statements; do not display a cell unrelated to its sentence. Do not prefix letters/month words already contained in an inserted value. When reviewing a rendered answer, any revised_answer must use this same parts format. All earlier evidence and commercial rules still apply; this override only changes how sentences link to their source values.'''
     started=time.monotonic()
     response=client.responses.parse(model=model,instructions=instructions,input=json.dumps(payload,default=str),text_format=schema,max_output_tokens=3000,store=False,**extra)
     stats=ACTIVE_STATS.get()
@@ -289,6 +307,9 @@ def validate_commercial_labels(db,plan,answer,results,contexts=()):
     """Check availability and benchmark claims against the actual scoped data."""
     import re
     prose=' '.join([c.text for c in answer.claims]+[answer.investigation,answer.recommendation,answer.measurement,answer.missing_information])
+    prose+=' '.join(c.interpretation for c in answer.context_review)
+    if not {c.context_id for c in answer.context_review}<={c['id'] for c in contexts}:
+        raise QueryBlocked('The context assessment references a note that was not retrieved.')
     if '\ufffc' in prose or '\ufffd' in prose:
         raise QueryBlocked('Remove replacement characters. Use evidence placeholders for dates and values, or omit them from optional sections.')
     if not any(r.get('table')=='approved_period_comparison' for r in results):
@@ -299,6 +320,7 @@ def validate_commercial_labels(db,plan,answer,results,contexts=()):
         required={c['id'] for c in contexts if any(word in str(c.get('event_type','')).lower() for word in ['leave','absence','closure'])
             and c.get('start_date','')<=scope.end_date and c.get('end_date','')>=scope.start_date}
         cited={i for c in answer.claims for i in c.context_ids}
+        cited.update(c.context_id for c in answer.context_review if c.relevance in ['relevant','conflicting'])
         if required-cited:
             raise QueryBlocked('The answer omitted relevant owner-reported temporary availability context: '+', '.join(sorted(required-cited))+'. Explain those notes as owner-reported alongside the measured capacity; do not subtract leave twice or recommend lasting roster cuts based on this temporary period.')
     if plan.diagnostic and plan.diagnostic.comparison_divisor>1:

@@ -132,6 +132,7 @@ def test_live_output_schema_cannot_invent_context_references():
     sample=dict(claims=[dict(parts=[dict(kind='text',text='Revenue '),dict(kind='value',citation=ref),dict(kind='text',text='.')],evidence=[ref],context_ids=[])],investigation='',recommendation='',measurement='',missing_information='',chart=dict(kind='none',result=0,x='',y=''))
     client.responses.parse.side_effect=lambda **kw:SimpleNamespace(output_parsed=kw['text_format'].model_validate(sample))
     for contexts in [[],[dict(id='CTX1')]]:
+        sample['context_review']={'note_0':dict(context_id='CTX1',relevance='relevant',interpretation='Owner-reported context informs this answer.')} if contexts else []
         answer=structured(client,'gpt-4.1-mini',Answer,'test',{'contexts':contexts,'results':[{'rows':[{'amount':420}]}]})
         assert answer.claims[0].text=='Revenue [[0]].'
         assert bind_claim_values([{'rows':[{'amount':420}]}],answer.claims[0].model_dump(),['',''])=='Revenue AUD 420.00.'
@@ -147,6 +148,11 @@ def test_live_output_schema_cannot_invent_context_references():
             with pytest.raises(ValidationError):schema.model_validate(invalid)
         if contexts:
             valid=deepcopy(sample);valid['claims'][0]['context_ids']=['CTX1'];schema.model_validate(valid)
+            assert answer.context_review[0].context_id=='CTX1'
+            invalid=deepcopy(sample);invalid['context_review']={}
+            with pytest.raises(ValidationError):schema.model_validate(invalid)
+            invalid=deepcopy(sample);invalid['context_review']['note_0']['context_id']='invented'
+            with pytest.raises(ValidationError):schema.model_validate(invalid)
 
 def test_direct_parts_cannot_shift_year_into_a_booking_count():
     from types import SimpleNamespace
