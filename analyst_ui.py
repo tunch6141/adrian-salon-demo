@@ -78,7 +78,7 @@ def render_result(item):
     if item.get('timing'):
         timing=item['timing']
         st.caption(f"Completed in {timing['total_seconds']:.1f}s · {len(timing['calls'])} AI calls")
-    if item['results']:
+    if item['results'] or item.get('issues'):
         with st.expander('Evidence and calculations'):
             st.caption(item['plan']['scope'])
             if item.get('dataset_version'):st.caption('Cleaned data version: '+item['dataset_version'])
