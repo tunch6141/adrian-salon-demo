@@ -33,6 +33,20 @@ def ai_extract(question,messages,key,model):
     if response.output_parsed is None:raise ValueError('The model did not return a usable interpretation')
     return response.output_parsed.model_dump()
 
+
+def staff_reply(question,text):
+    """Resolve explicit offered names locally; ambiguous language never selects a person."""
+    if question['kind']!='staff':return None
+    value=text.strip().rstrip('.!').strip()
+    if re.search(r"\b(?:not|maybe|perhaps|unsure|either|or)\b|don.?t know|not sure|\?",value,re.I):
+        return {'intent':'clarify','message':'Please confirm one staff name or ID when you are sure. The record will remain unresolved until you confirm a proposed correction.'}
+    prefixes=[r'',re.escape(question['raw_value'])+r'\s+(?:is|means|refers to)\s+',r'(?:it is|it\'s|that is|that\'s)\s+']
+    matches=[o for o in question['options'] if any(
+        re.fullmatch(prefix+re.escape(token),value,re.I)
+        for prefix in prefixes for token in (o['value'],o['label']))]
+    if len(matches)==1:return {'intent':'answer','value':matches[0]['value']}
+    return None
+
 def proposed(question,value,owner_text):
     """Only allow offered identities or an explicit finite nonnegative cost; never apply."""
     if question['kind']=='cost':
@@ -44,8 +58,13 @@ def proposed(question,value,owner_text):
         if cost not in amounts:raise ValueError('The proposed cost was not stated in your reply. Please state it explicitly.')
         value=format(cost,'f');summary=f'Set item {question["record_id"]} unit cost to AUD {value} excluding GST.'
     else:
-        selected=next((o for o in question['options'] if o['value']==value),None)
+        # Models sometimes return the displayed name instead of its offered ID.
+        # Resolve only an exact, unique offered label/ID, then retain owner-evidence checks.
+        matches=[o for o in question['options'] if str(value).strip().casefold() in
+                 (o['value'].casefold(),o['label'].casefold())]
+        selected=matches[0] if len(matches)==1 else None
         if not selected:raise ValueError('That identity is not one of the available choices. Leave this unresolved until the correct record exists.')
+        value=selected['value']
         if value=='new_identity':
             if not re.search(r'separate|new customer|different person',owner_text,re.I):raise ValueError('Please explicitly say whether to keep this as a separate customer.')
         elif not any(re.search(r'(?<!\w)'+re.escape(token)+r'(?!\w)',owner_text,re.I) for token in [value,selected['label'].split(' (')[0]]):

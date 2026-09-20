@@ -33,11 +33,15 @@ def show_rows(rows, zone):
     if not rows:
         st.caption("No records yet.")
         return
+    columns=list(dict.fromkeys(k for row in rows for k in row))
+    if 'appointment_start' in columns and 'appointment_end' in columns:
+        columns.remove('appointment_end')
+        columns.insert(columns.index('appointment_start')+1,'appointment_end')
     st.dataframe(
         [
             {
-                k.replace("_", " ").title(): display_value(v, zone)
-                for k, v in row.items()
+                k.replace("_", " ").title(): display_value(row.get(k), zone)
+                for k in columns
             }
             for row in rows
         ],
@@ -80,7 +84,7 @@ def selected_records(intake, question):
 
 def explain_question(question, text):
     if not question or not re.search(
-        r"explain|what do you mean|understand|confus|simpler|clearer|why.*ask",
+        r"explain|what do you mean|understand|confus|simpler|clearer|why.*ask|(?:other|more|any).*details|what.*(?:know|details|information)",
         text,
         re.I,
     ):
@@ -89,6 +93,8 @@ def explain_question(question, text):
     return {
         "staff": (
             "The booking uses a name we cannot match confidently. "
+            "The available booking details are shown above, including the customer ID, appointment start and end, and booking source. "
+            "The original staff value is “" + str(question['raw_value']) + "”; it does not establish which staff member this is. "
             "Tell me the staff name or ID it belongs to. "
             "This fixes attribution; it does not add a sale."
         ),

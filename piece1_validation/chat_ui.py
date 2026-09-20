@@ -16,6 +16,7 @@ from .clarification import (
     context_note,
     validate_checkpoint,
     stock_reply,
+    staff_reply,
 )
 from .review_ui import (
     business_zone,
@@ -137,6 +138,8 @@ def render_chat(intake):
                 }
             elif selected == "sale" or money_request(text):
                 parsed = {"intent": "transaction"}
+            elif q and q["kind"] == "staff" and (local := staff_reply(q, text)):
+                parsed = local
             elif (
                 q
                 and q["kind"] == "cost"
