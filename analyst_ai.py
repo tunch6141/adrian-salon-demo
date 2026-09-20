@@ -415,6 +415,9 @@ def _investigate(client,model,db,question,history,context_store,stage):
     # One formatting repair only: reuse evidence rather than replanning and rerunning SQL.
     for attempt in range(2):
         try:
+            # An uncited aside must not suppress the independently supported
+            # core answer. Omit it rather than inventing a supporting reference.
+            answer.claims=[c for c in answer.claims if c.evidence or c.context_ids]
             bound=answer.model_copy(deep=True)
             validate_commercial_labels(db,plan,bound,results)
             if bound.additional_queries:raise QueryBlocked('The answer requested unexecuted queries.')
@@ -441,6 +444,7 @@ def _investigate(client,model,db,question,history,context_store,stage):
         return {'plan':plan.model_dump(),'answer':None,'results':results,'contexts':contexts,'status':'facts_only','issues':review.issues}
     if review.revised_answer is not None:
         bound=review.revised_answer.model_copy(deep=True)
+        bound.claims=[c for c in bound.claims if c.evidence or c.context_ids]
         try:
             validate_commercial_labels(db,plan,bound,results)
             if bound.additional_queries:raise QueryBlocked('The reviewed answer requested unexecuted queries.')

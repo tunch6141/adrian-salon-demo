@@ -206,3 +206,15 @@ def test_sql_fallback_binds_actual_query_period_even_if_planner_omits_note_dates
     assert result['answer']['claims'][0]['text']=='In August 2026, phone contributed 98 completed bookings.'
     assert query_period([dict(sql="SELECT * FROM booking_records WHERE appointment_date >= '2026-08-01' AND appointment_date < '2026-09-01'")])==('2026-08-01','2026-08-31')
     assert query_period([dict(sql=sql),dict(sql=sql.replace('2026-08','2026-07'))]) is None
+
+
+def test_uncited_aside_does_not_suppress_supported_core_answer(db):
+    p=Plan(intent='analysis',scope='Sarah day',missing_information='',queries=[],context_entity='Sarah',context_start='2026-09-17',context_end='2026-09-17',draft=None,
+        diagnostic=Diagnostic(staff=['Sarah'],start_date='2026-09-17',end_date='2026-09-17'))
+    a=Answer(claims=[dict(text='Revenue was [[0]].',evidence=[dict(result=0,row=0,column='service_revenue_aud',format='money')],context_ids=[]),
+        dict(text='Unsubstantiated aside.',evidence=[],context_ids=[])],investigation='',recommendation='',measurement='',missing_information='',chart=dict(kind='none',result=0,x='',y=''))
+    with patch('analyst_ai.structured',side_effect=[p,a,Review(approved=True,issues=[])]) as calls:
+        result=investigate(None,'gpt-4.1-mini',db,'Sarah on September seventeenth?',[],ContextStore())
+    assert result['status']=='answered'
+    assert [c['text'] for c in result['answer']['claims']]==['Revenue was AUD 420.00.']
+    assert len(calls.call_args.args[-1]['rendered_answer']['claims'])==1
