@@ -155,7 +155,7 @@ def structured(client,model,schema,instructions,payload):
         evidence_field=Field(default_factory=list) if citations else Field(default_factory=list,max_length=0)
         claim_type=create_model('EvidenceClaim',__base__=Claim,context_ids=(context_type,context_field),
             evidence=(list[citation_type],evidence_field),
-            text=(str,Field(pattern=r'^(?:[^0-9\[\]{}]|\[\[(?:[0-9]+|start|end|context[0-9]+_(?:start|end))\]\])*$',
+            text=(str,Field(pattern=r'^(?:[^0-9\[\]{}\uFFFC\uFFFD]|\[\[(?:[0-9]+|start|end|context[0-9]+_(?:start|end))\]\])*$',
                 description='Write prose with all numeric facts, dates, years and IDs containing digits inserted through [[0]], [[1]], [[start]], [[end]] or cited context date placeholders. Never type literal digits.')))
         answer_type=create_model('Answer',__base__=Answer,claims=(list[claim_type],Field(max_length=4)))
         schema=answer_type if schema is Answer else create_model('Review',__base__=Review,revised_answer=(answer_type|None,None))
@@ -321,6 +321,14 @@ def _investigate(client,model,db,question,history,context_store,stage):
         plan.missing_information='No matching records or confirmed business notes were found for this scope. Please check the identifier or period.'
         return {'plan':plan.model_dump(),'answer':None,'results':[],'contexts':[], 'status':'clarify',
                 'issues':['No matching evidence was found.']}
+    if not results and contexts:
+        # A request to read stored notes is an exact record display. Quote their
+        # recorded dates/content without asking the model to reconstruct them.
+        claims=[dict(text=f"Owner-reported note for {c['entity']} ({c['start_date']} to {c['end_date']}): {c['explanation']}",
+            evidence=[],context_ids=[c['id']]) for c in contexts]
+        return {'plan':plan.model_dump(),'answer':dict(claims=claims,additional_queries=[],investigation='',recommendation='',measurement='',
+            missing_information='These are recorded owner reports, not independently verified causes.',chart=dict(kind='none',result=0,x='',y='',series='')),
+            'results':[],'contexts':contexts,'status':'answered','issues':[],'execution_notes':['Recorded owner notes displayed verbatim.']}
     payload={**planning,'plan':plan.model_dump(),'results':results,'contexts':contexts,
         'allowed_context_ids':[c['id'] for c in contexts],'execution_notes':execution_notes}
     for round_index in range(3):

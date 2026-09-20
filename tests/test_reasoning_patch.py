@@ -111,14 +111,16 @@ def test_capacity_cannot_be_labelled_booked_hours():
     with pytest.raises(QueryBlocked):bind_claim_values(result,claim,['',''])
     assert bind_claim_values(result,{**claim,'text':'There were [[0]] bookable hours.'},['',''])=='There were 8 bookable hours.'
 
-def test_context_only_lookup_runs_writer_and_review(db):
+def test_context_only_lookup_displays_exact_confirmed_notes(db):
     p=Plan(intent='lookup',scope='Sarah notes',missing_information='',queries=[],context_entity='Sarah',context_start='2026-09-07',context_end='2026-09-13',draft=None)
     a=Answer(claims=[dict(text='The owner reported leave from [[context0_start]] to [[context0_end]].',evidence=[],context_ids=['CTX1'])],investigation='',recommendation='',measurement='',missing_information='',chart=dict(kind='none',result=0,x='',y=''))
-    with patch('analyst_ai.structured',side_effect=[p,a,Review(approved=True,issues=[])]) as calls:
+    with patch('analyst_ai.structured',return_value=p) as calls:
         result=investigate(None,'gpt-4.1-mini',db,'What context is recorded for Sarah?',[],CombinedContextStore(db.intake,ContextStore()))
     assert result['status']=='answered' and not result['results']
     assert '2026-09-08' in result['answer']['claims'][0]['text']
-    assert calls.call_count==3
+    assert calls.call_count==1
+    assert result['answer']['claims'][0]['context_ids']==['CTX1']
+    assert 'Sarah had two days of approved annual leave.' in result['answer']['claims'][0]['text']
 
 def test_live_output_schema_cannot_invent_context_references():
     from unittest.mock import MagicMock
