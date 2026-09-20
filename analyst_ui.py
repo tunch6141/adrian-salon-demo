@@ -5,12 +5,38 @@ import hmac
 import pandas as pd
 import streamlit as st
 import altair as alt
-from analyst_engine import Database, QueryBlocked
+from analyst_engine import Database, QueryBlocked, validate_chart
 from analyst_ai import investigate, ANSWER_RELEASE
 from business_context import ContextStore
 
 
 def safe_text(text):st.markdown(text.replace('$',r'\$'))
+
+
+def display_frame(rows):
+    """Format mixed/transposed tables before pandas turns numbers into objects."""
+    frame=pd.DataFrame(rows)
+    for col in frame.columns:
+        frame[col]=frame[col].map(lambda v: f'{v:,.2f}'.rstrip('0').rstrip('.') if isinstance(v,float) else v)
+    return frame
+
+
+def result_chart(item):
+    """A valid data chart does not depend on successful prose generation."""
+    chart=(item.get('answer') or {}).get('chart')
+    if chart and chart['kind']!='none':
+        try:validate_chart(item['results'],chart);return chart
+        except QueryBlocked:pass
+    for i,result in enumerate(item.get('results',[])):
+        if not result['rows']:continue
+        if result['table']=='approved_revenue_trend':
+            chart=dict(kind='line',result=i,x='period_start',y='net_revenue_aud',series='staff_name')
+        elif result['table']=='approved_staff_summary' and len(result['rows'])>1:
+            chart=dict(kind='bar',result=i,x='staff_name',y='service_revenue_aud',series='')
+        else:continue
+        try:validate_chart(item['results'],chart);return chart
+        except QueryBlocked:continue
+    return None
 
 
 def diagnostic_facts(item):
@@ -53,6 +79,9 @@ def build_chart(df,chart):
 
 def render_result(item):
     status=item['status']
+    scope=item.get('plan',{}).get('diagnostic') or item.get('plan',{}).get('revenue') or item.get('plan',{}).get('trend')
+    if scope and item.get('reporting_date') and scope['start_date']<=item['reporting_date']<scope['end_date']:
+        st.caption('Actual results are to date through '+item['reporting_date']+'; the requested period has not finished. Future bookings are scheduled, not completed revenue.')
     if status=='explanation':
         st.info('The app retrieved data but could not verify its written explanation. That does not mean your business question is unanswerable. The tables contain the retrieved figures; the explanation was withheld to avoid presenting an unchecked claim.')
     elif status=='facts_only':
@@ -93,7 +122,7 @@ def render_result(item):
             safe_text(claim['text'])
         if item['plan'].get('trend'):
             st.caption('Calendar periods are clipped to your requested dates. Partial first/last periods should not be compared with full periods.')
-        if item['plan'].get('booking_id') or item['plan'].get('trend') or (item['plan'].get('queries') and not item['plan'].get('diagnostic')):
+        if item['plan'].get('customer') or item['plan'].get('booking_id') or item['plan'].get('trend') or (item['plan'].get('queries') and not item['plan'].get('diagnostic')):
             for result in item['results']:
                 if result['table']=='approved_trend_totals':continue
                 frame=pd.DataFrame(result['rows'])
@@ -103,14 +132,9 @@ def render_result(item):
         if item['plan'].get('diagnostic') and len(item['plan']['diagnostic']['staff'])>1 and item['results']:
             summary=pd.DataFrame(item['results'][0]['rows'])
             if 'staff_name' in summary:
-                comparison=summary.set_index('staff_name').T
+                comparison=display_frame(summary).set_index('staff_name').T
                 comparison.index=([str(x).replace('_',' ').title() for x in comparison.index])
                 st.dataframe(comparison.round(2),use_container_width=True)
-        chart=a['chart']
-        if chart['kind']!='none':
-            df=pd.DataFrame(item['results'][chart['result']]['rows'])
-            x,y=chart['x'],chart['y']
-            st.altair_chart(build_chart(df,chart),use_container_width=True)
         for label,key in [('What was investigated','investigation'),('Suggested action','recommendation'),('What to measure','measurement')]:
             if a[key]:
                 with st.expander(label):safe_text(a[key])
@@ -124,6 +148,9 @@ def render_result(item):
                         st.caption(f"Owner-reported · {note['entity']} · {note['start_date']} to {note['end_date']}")
                         safe_text(note['explanation'])
                         safe_text(review.get('interpretation',''))
+    chart=result_chart(item)
+    if chart:
+        st.altair_chart(build_chart(pd.DataFrame(item['results'][chart['result']]['rows']),chart),use_container_width=True)
     if item.get('timing'):
         timing=item['timing']
         st.caption(f"Completed in {timing['total_seconds']:.1f}s · {len(timing['calls'])} AI calls")
@@ -174,15 +201,45 @@ def context_form(store):
                 st.error('The note was not confirmed saved. Check the dates, source and database connection.')
     with st.expander('Context log'):
         try:
-            rows=store.search()
-            st.dataframe(pd.DataFrame(rows),hide_index=True)
+            rows=store.all_rows()
+            st.dataframe(display_frame(rows),hide_index=True)
             st.download_button('Export context log',json.dumps(rows,indent=2),'business_context.json','application/json')
             if rows:
                 ids=[r['id'] for r in rows]
-                chosen=st.selectbox('Note to retract',ids,format_func=lambda i: next(r['entity']+' · '+r['start_date']+' · '+r['event_type'] for r in rows if r['id']==i))
-                confirm=st.checkbox('Confirm retraction of this note')
-                if st.button('Retract selected note',disabled=not confirm):
-                    store.retract(chosen);st.rerun()
+                chosen=st.selectbox('Note to review or correct',ids,format_func=lambda i: next(r['entity']+' · '+r['start_date']+' · '+r['event_type']+' · '+r['status'] for r in rows if r['id']==i))
+                original=next(r for r in rows if r['id']==chosen)
+                st.caption('Corrections apply to future answers. Previous conversation replies remain historical. Original raw data is preserved.')
+                with st.form('correct_context_'+chosen+'_'+original.get('recorded_at','')):
+                    known=['Sarah','Matthew','Sam','Salon']
+                    if original['entity'] not in known:known.append(original['entity'])
+                    entity=st.selectbox('Corrected applies to',known,index=known.index(original['entity']))
+                    start=st.date_input('Corrected start date',date.fromisoformat(original['start_date']))
+                    end=st.date_input('Corrected end date',date.fromisoformat(original['end_date']))
+                    kind=st.text_input('Corrected event type',original['event_type'])
+                    explanation=st.text_area('Corrected explanation',original['explanation'],max_chars=2000)
+                    actor=st.text_input('Changed by',key='context_actor_'+chosen)
+                    reason=st.text_input('Reason for change',key='context_reason_'+chosen)
+                    action=st.selectbox('Change', ['Save correction','Retract note'])
+                    confirmed=st.checkbox('I approve this change and its entry in the change history.')
+                    submitted=st.form_submit_button('Confirm context change')
+                if submitted:
+                    try:
+                        if not confirmed:raise ValueError('Please approve the change before saving.')
+                        store.correct(original,dict(entity=entity,start_date=start.isoformat(),end_date=end.isoformat(),event_type=kind,explanation=explanation),actor,reason,retract=action=='Retract note')
+                        st.session_state['context_change_saved']=True
+                        st.rerun()
+                    except ValueError as exc:st.error(str(exc))
+                if st.session_state.pop('context_change_saved',False):st.success('Context updated. The change history preserves the previous version.')
+                if not original.get('source_record'):
+                    events=store.history(chosen)
+                    st.write('Change history')
+                    for event in events:
+                        before=event.get('before_record') or {};after=event.get('after_record') or {}
+                        st.caption(str(event['recorded_at'])+' · '+str(event['actor'])+' · '+str(event['operation']))
+                        st.write('Reason: '+str(after.get('change_reason') or 'Original note'))
+                        fields=['entity','start_date','end_date','explanation','status']
+                        st.dataframe(pd.DataFrame([{'Field':k,'Before':before.get(k,''),'After':after.get(k,'')} for k in fields]),hide_index=True)
+                    st.download_button('Export selected change history',json.dumps(events,indent=2),'context_change_history.json','application/json')
         except Exception:st.error('Context log is unavailable. Check the database connection.')
 
 
@@ -207,7 +264,7 @@ def render(t,setting):
     else:
         st.info('Local preview: Supabase data storage is not connected.')
     rows=st.session_state.setdefault('context_rows',[])
-    store=ContextStore(setting('SUPABASE_URL'),setting('SUPABASE_SERVICE_ROLE_KEY'),rows)
+    store=ContextStore(setting('SUPABASE_URL'),setting('SUPABASE_SERVICE_ROLE_KEY'),rows,st.session_state.setdefault('context_events',[]))
     if hasattr(t,'tables'):
         from analytics.runtime import CombinedContextStore
         store=CombinedContextStore(t,store)
@@ -235,6 +292,7 @@ def render(t,setting):
             with st.status('Investigating your question…',expanded=True) as progress:
                 db=Database.from_intake(t) if hasattr(t,'tables') else Database(t)
                 history=[{'question':x['question'],'plan':x['result']['plan'],'answer':x['result']['answer'],'status':x['result']['status'],
+                    'resolved_records':[{k:row[k] for k in ['booking_id','customer_id','customer_name','appointment_date','first_completed_visit_date'] if k in row} for r in x['result']['results'] if r['table'] in ['booking_records','approved_customer_profile'] for row in r['rows'][:1]],
                     'issues':x['result'].get('issues',[]),'execution_notes':x['result'].get('execution_notes',[]),
                     'retrieved_scopes':[{'table':r['table'],'sql':r['sql']} for r in x['result']['results']]}
                     for x in turns[-5:]]

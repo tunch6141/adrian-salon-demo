@@ -97,7 +97,10 @@ def validate_checkpoint(data,raw):
     accepted=[]
     for d in decisions:
         if not isinstance(d,dict) or not all(isinstance(d.get(k),str) for k in ['table','field','raw_value','value','reason','approved_by','approved_at']):raise ValueError('Malformed correction entry.')
-        current=Intake(raw,accepted); qs=questions(current)
+        # Revisions are append-only approvals for the same original source value.
+        # Remove older approvals of this scope only while validating the new one.
+        from .correction_revision import scope_key
+        current=Intake(raw,[a for a in accepted if scope_key(a)!=scope_key(d)]); qs=questions(current)
         kinds={'bookings':'staff','inventory_items':'cost','customer_import_batch':'identity'}
         q=next((q for q in qs if q['kind']==kinds.get(d.get('table')) and q['raw_value']==d.get('raw_value') and (not d.get('record_id') or q['record_id']==d['record_id'])),None)
         if q is None:raise ValueError('Checkpoint correction does not match an unresolved issue in this dataset.')

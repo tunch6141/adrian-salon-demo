@@ -38,9 +38,14 @@ class CombinedContextStore:
         self.intake,self.store=intake,store
         self.persistent=store.persistent
     def search(self,entity='',start='',end=''):
-        source=[r for r in self.intake.contexts if (not entity or entity=='Salon' or r['entity'] in [entity,'Salon']) and (not start or r['end_date']>=start) and (not end or r['start_date']<=end)]
-        rows=self.store.search(entity,start,end)
+        return [r for r in self.all_rows() if r['status']=='active' and (not entity or entity=='Salon' or r['entity'] in [entity,'Salon']) and (not start or r['end_date']>=start) and (not end or r['start_date']<=end)]
+    def all_rows(self):
+        rows=self.store.all_rows()
+        superseded={r.get('origin_id') for r in rows}
+        source=[dict(r,source_record=True) for r in self.intake.contexts if r['id'] not in superseded]
         return list({r['id']:r for r in source+rows}.values())
+    def correct(self,*args,**kwargs):return self.store.correct(*args,**kwargs)
+    def history(self,record_id):return self.store.history(record_id)
     def save(self,*args,**kwargs):return self.store.save(*args,**kwargs)
     def retract(self,record_id):
         if any(r['id']==record_id for r in self.intake.contexts):

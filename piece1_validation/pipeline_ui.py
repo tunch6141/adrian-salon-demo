@@ -12,6 +12,7 @@ def render_pipeline(intake, setting):
         st.info('Local preview: connect Supabase to save raw data, cleaned versions and approvals across sessions.')
         return
     st.caption(f'Saved in Supabase · Cleaned version {intake.version_id[:8]} · Raw batch {intake.raw_id[:12]}')
+    render_correction_revision(intake,setting)
     with st.expander('Import a raw data snapshot'):
         st.write('Upload a ZIP containing the salon CSV tables, or select the CSV files together. Each import is a complete snapshot, not an append. Previously approved rules are reused; new ambiguities remain visible for review.')
         uploads = st.file_uploader('Raw CSV files or one ZIP',type=['csv','zip'],accept_multiple_files=True,key='pipeline_upload')
@@ -59,7 +60,7 @@ def render_pipeline(intake, setting):
                     format_func=lambda i:events[i]['approved_at']+' · '+labels.get(events[i]['kind'],events[i]['kind'])+' · '+events[i]['actor'],key='pipeline_history_event')
                 event=events[selected];details=event['details'];changes=details.get('changes',{})
                 rows=[{'Table':d['table'],'Record':d.get('record_id','Matching future records'),
-                       'Field':d['field'],'Original value':d['raw_value'],'Approved value':d['value'],
+                       'Field':d['field'],'Original value':d['raw_value'],'Previous approved value':d.get('previous_value',''),'Approved value':d['value'],
                        'Confirmed by':d['approved_by'],'Confirmed at':d['approved_at'],'Reason':d['reason']}
                       for d in changes.get('decisions',[])]
                 if rows:st.dataframe(rows,hide_index=True)
@@ -75,3 +76,48 @@ def render_pipeline(intake, setting):
                 st.download_button('Download selected event',json.dumps(event,indent=2),'approval_event.json','application/json')
             st.download_button('Download approval history',json.dumps(events,indent=2),'approval_history.json','application/json')
         except ValueError as exc: st.error(str(exc))
+
+
+def render_correction_revision(intake,setting):
+    from .correction_revision import current_rules, revision_question, prepare_revision
+    from analytics.persistence import checkpoint,save_review
+    import uuid
+    with st.expander('Correct an earlier data approval'):
+        st.write('Review a replacement for an approved cleaning rule. The original raw data and earlier approvals remain saved. The replacement also applies to future matching imports.')
+        rules=current_rules(intake.source,intake.decisions)
+        if not rules:
+            st.caption('No approved cleaning rules yet.');return
+        idx=st.selectbox('Approved correction to change',range(len(rules)),format_func=lambda i:rules[i]['table']+' · '+rules[i]['raw_value']+' → '+rules[i]['value'],key='revision_rule')
+        old=rules[idx];q=revision_question(intake.source,intake.decisions,old)
+        if not q:
+            st.info('This rule has no matching record in the current raw snapshot.');return
+        with st.form('revise_rule_form'):
+            if q['options']:
+                options=[o['value'] for o in q['options']]
+                value=st.selectbox('Correct replacement',options,index=options.index(old['value']) if old['value'] in options else 0,format_func=lambda v:next(o['label'] for o in q['options'] if o['value']==v))
+            else:value=st.text_input('Correct unit cost in AUD excluding GST',old['value'])
+            actor=st.text_input('Person approving this replacement')
+            reason=st.text_input('Why should the earlier approval change?')
+            preview=st.form_submit_button('Preview correction')
+        if preview:
+            try:
+                cp,changes=prepare_revision(intake.source,checkpoint(st.session_state),old,value,actor,reason)
+                st.session_state['rule_revision_preview']=dict(checkpoint=cp,changes=changes,actor=actor,expected=intake.version_id,event_id=str(uuid.uuid4()))
+                st.session_state['approve_rule_revision']=False
+            except ValueError as exc:
+                st.session_state.pop('rule_revision_preview',None);st.error(str(exc))
+        pending=st.session_state.get('rule_revision_preview')
+        if pending:
+            st.caption('Proposed changes to the current cleaned snapshot')
+            st.dataframe(pending['changes'],hide_index=True)
+            st.write('Approved by: '+pending['actor']+' · Reason: '+pending['checkpoint']['decisions'][-1]['change_reason'])
+            confirm=st.checkbox('I approve this replacement and the creation of a new cleaned version.',key='approve_rule_revision')
+            if st.button('Save replacement correction',disabled=not confirm):
+                try:
+                    if pending['expected']!=intake.version_id:raise ValueError('The cleaned data changed. Preview the correction again before saving.')
+                    if st.session_state.get('p1_pending'):raise ValueError('Finish or cancel the other pending correction first.')
+                    save_review(st.session_state,setting,{'decisions':pending['checkpoint']['decisions']},pending['actor'],'correction',pending['event_id'])
+                    st.session_state.pop('rule_revision_preview',None)
+                    st.session_state['p1_notice']='Replacement saved in a new cleaned version. The approval history retains both decisions.'
+                    st.rerun()
+                except ValueError as exc:st.error(str(exc))
