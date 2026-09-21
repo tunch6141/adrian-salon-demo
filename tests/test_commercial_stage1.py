@@ -107,6 +107,8 @@ def test_result_citations_verify_numbers_without_model_cell_addresses():
     assert render_statement(statement,results,scope())==statement.text
     statement.text='Revenue is 900.'
     with pytest.raises(QueryBlocked):render_statement(statement,results,scope())
+    statement.text='Revenue was 2.6% lower.'
+    assert render_statement(statement,[dict(rows=[dict(percentage_change=-2.62295)])],scope())==statement.text
 
 
 def test_revenue_tools_resolve_the_same_staff_ids_as_performance():

@@ -87,7 +87,7 @@ def render_statement(statement,results,scope):
     for index in statement.sources:
         if index<0 or index>=len(results):raise QueryBlocked(f'Unknown result source {index}; use an available result_index.')
         checked_refs.extend(dict(result=index,row=j,column=k) for j,row in enumerate(results[index]['rows']) for k in row)
-    try:validate_claim_numbers(results,dict(text=literal,evidence=checked_refs),statement.context_ids,[scope.start_date,scope.end_date])
+    try:validate_claim_numbers(results,dict(text=literal,evidence=checked_refs),statement.context_ids,[scope.start_date,scope.end_date],allow_magnitude=True)
     except QueryBlocked as exc:
         raise QueryBlocked(f'{exc} Sentence: {text!r}; cited values: {values!r}. Cite each displayed value, or omit an uncomputed number.') from exc
     return re.sub(r'\[\[(.*?)\]\]',lambda m:slots[m.group(1)],text)
@@ -113,7 +113,7 @@ def complete_references(statement,results):
         number=float(token.replace(',',''));decimals=len(token.split('.')[1]) if '.' in token else 0
         tolerance=0.5*10**(-decimals)+1e-8
         if any(type(v) in (int,float) and abs(v-number)<tolerance for v in cited):continue
-        matches=[(i,j,k) for i,j,k,v in cells if type(v) in (int,float) and abs(v-number)<tolerance]
+        matches=[(i,j,k) for i,j,k,v in cells if type(v) in (int,float) and (abs(v-number)<tolerance or abs(abs(v)-number)<tolerance)]
         # Retain all matching result sources for semantic review rather than
         # guessing which of several equal-valued cells explains the statement.
         statement.sources=sorted(set(statement.sources)|{i for i,_,_ in matches})

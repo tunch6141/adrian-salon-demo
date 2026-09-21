@@ -244,13 +244,15 @@ def service_diagnostic(db,staff,start,end):
     return result
 
 
-def validate_claim_numbers(results,claim,context_ids,periods):
+def validate_claim_numbers(results,claim,context_ids,periods,allow_magnitude=False):
     """Reject invented numeric aggregates; a valid citation alone is insufficient."""
     import re
     values=[]
     for ref in claim['evidence']:
         value=reference_value(results,ref)
-        if isinstance(value,(int,float)):values.append(float(value))
+        if isinstance(value,(int,float)):
+            values.append(float(value))
+            if allow_magnitude:values.append(abs(float(value)))
         elif isinstance(value,str):
             # Numeric portions of cited dates/labels can be quoted, not used as metrics.
             values.extend(float(n) for n in re.findall(r'\d+(?:\.\d+)?',value))
