@@ -5,7 +5,8 @@ from pydantic import BaseModel, Field
 from analyst_engine import Database
 from analytics.runtime import CombinedContextStore
 from business_context import ContextStore
-from commercial.runtime import investigate, model_call
+from commercial.v2_runtime import investigate
+from commercial.runtime import model_call
 
 CORE=[
  ('revenue','Why was my revenue lower this month compared with last month?'),

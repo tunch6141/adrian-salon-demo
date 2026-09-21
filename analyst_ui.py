@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 from analyst_engine import Database, QueryBlocked, validate_chart
-from commercial.runtime import investigate, ANSWER_RELEASE
+from commercial.v2_runtime import investigate, ANSWER_RELEASE
 from business_context import ContextStore
 
 
@@ -107,7 +107,7 @@ def build_chart(df,chart):
     return c
 
 def render_result(item):
-    if item.get('engine')=='commercial_stage1':
+    if item.get('engine') in ['commercial_stage1','commercial_native_tools']:
         from commercial.presentation import render_commercial
         return render_commercial(item,build_chart,safe_text)
     status=item['status']

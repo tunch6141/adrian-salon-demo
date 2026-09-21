@@ -9,15 +9,13 @@ def test_app_uses_corrected_data_in_analytical_chat():
     app=AppTest.from_file(str(ROOT/'pages/3_Stage_1_Preview.py'),default_timeout=60)
     app.secrets.update(DEMO_PASSWORD='test',OPENAI_API_KEY='fake-key',OPENAI_MODEL='mock-model')
     app.run();app.text_input(key='v4_password').set_value('test').run()
-    from commercial.models import Scope, Step, ToolCall, Diagnosis, Statement, Visual, Audit, Conclusion, EvidenceAssessment
-    from analytics.runtime import load_snapshot
-    scope=Scope(objective='Check revenue',subject='revenue',entities=['Sarah'],start_date='2026-09-07',end_date='2026-09-13',measures=['net_revenue'],category='all',display='text')
-    plan=Step(intent='lookup',topic_relation='new',scope=scope,hypotheses=[],calls=[ToolCall(kind='sql',purpose='Retrieve requested revenue',sql="SELECT SUM(net_revenue) AS revenue FROM financial_lines WHERE staff_id='S01' AND posted_date BETWEEN '2026-09-07' AND '2026-09-13'")],final=None,draft=None,clarification='',unresolved=[])
-    notes=[r for r in load_snapshot().contexts if r['entity'] in ['Sarah','Salon'] and r['end_date']>='2026-09-07' and r['start_date']<='2026-09-13']
-    final=Diagnosis(direct_answer=Statement(text='Sarah recorded [[0]] net revenue.',evidence=[dict(result=0,row=0,column='revenue',format='money')],level='observed'),key_evidence=[],primary_driver=None,secondary_drivers=[],alternatives=[],confidence='strongly supported',next_step_kind='none',next_step=None,visual=Visual(),table_results=[],context_review=[dict(context_id=r['id'],relevance='relevant',interpretation='Owner-reported context; does not change recorded revenue.') for r in notes],limitations='')
-    completed=plan.model_copy(deep=True);completed.calls=[];completed.final=final
-    assessment=EvidenceAssessment(outcome_status='factual_lookup',outcome_check='Requested amount retrieved.',supported_relationships=['Result 0'],established_driver=None,unsupported_claims=[],next_evidence=[])
-    with patch('openai.OpenAI',return_value=object()), patch('commercial.runtime.model_call',side_effect=[plan,completed,assessment,Conclusion(hypotheses=[],final=final),Audit(approved=True,problems=[])]):
+    from test_commercial_v2 import NativeClient, scope, query, final
+    from commercial.v2_models import FrameQuestion
+    client=NativeClient([
+        ('frame_question',FrameQuestion(intent='lookup',relation='new',scope=scope(entities=['Sarah'],start_date='2026-09-07',end_date='2026-09-13',category='all'),hypotheses=[])),
+        ('query_data',query()),
+        ('finish_answer',final(answer='Sarah recorded AUD 1,410.00 net revenue.'))])
+    with patch('openai.OpenAI',return_value=client):
         app.text_input[1].set_value('What was Sarah revenue for 7 to 13 September?')
         next(b for b in app.button if b.label=='Send question').click().run()
     assert not app.exception

@@ -57,7 +57,7 @@ def test_active_path_does_not_import_legacy_prompts_or_recipes():
         assert 'from analyst_ai' not in text and 'analytics.reasoning' not in text and 'analytics.rules' not in text
         assert 'Sarah' not in text and 'Matthew' not in text
     ui=(folder.parent/'analyst_ui.py').read_text(encoding='utf-8')
-    assert 'from commercial.runtime import investigate' in ui
+    assert 'from commercial.v2_runtime import investigate' in ui
 
 
 def test_real_data_lookup_audited_and_state_saved_without_legacy_rules():

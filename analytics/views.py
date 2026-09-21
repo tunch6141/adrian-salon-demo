@@ -1,6 +1,6 @@
 """Approved SQL views at declared grains. Test expectations are never loaded here."""
 from collections import defaultdict
-from datetime import date,timedelta
+from datetime import date,timedelta,datetime
 import pandas as pd
 from .calculations import (local_date,financial_lines,completed_services,capacity_rows,stock_coverage,landed_receipts,
     quote_queue,receivables,future_workload,customer_returns,capability_rows,enabled,staff_return_outcomes,booking_outcomes,pricing_simulation)
@@ -10,6 +10,8 @@ VIEW_MODULES={'booking_records':'bookings','customer_records':'customers','staff
  'staff_daily':'staff_capacity','inventory_coverage':'inventory','landed_receipts':'suppliers','sale_cost_allocations':'gross_margin',
  'quote_followup_queue':'quotes','receivables':'receivables','future_workload':'bookings','customer_returns':'customers',
  'customer_value':'customers','service_sales':'services','attachment_pairs':'services','quote_conversion':'quotes'}
+
+VIEW_MODULES['customer_visits']='customers'
 
 def build_views(intake):
     finance=financial_lines(intake) if enabled(intake,'revenue') else [];services=completed_services(intake);capacity=capacity_rows(intake)
@@ -78,6 +80,23 @@ def build_views(intake):
         'customer_name':customers.get(r.get('customer_id'),{}).get('customer_name')}
         for r in intake.tables.get('bookings',[])]
     rows['customer_records']=[dict(r) for r in intake.tables.get('customers',[])]
+    # One completed booking per row. Master first-visit dates extend the export
+    # history; an earliest observed visit alone does not prove a new customer.
+    completed=[r for r in rows['booking_records'] if r['status']=='Completed' and r.get('appointment_end')
+               and datetime.fromisoformat(r['appointment_end'])<=intake.asof]
+    earliest={}
+    for r in completed:
+        cid=r['customer_id'];day=r['appointment_date']
+        earliest[cid]=min(day,earliest.get(cid,day))
+    rows['customer_visits']=[]
+    for r in completed:
+        cid=r['customer_id'];day=r['appointment_date']
+        master_first=customers.get(cid,{}).get('first_completed_visit_date')
+        prior=earliest.get(cid,day)<day or bool(master_first and master_first<day)
+        kind='returning' if prior else 'new' if master_first==day else 'unknown'
+        rows['customer_visits'].append({k:r[k] for k in ['booking_id','customer_id','customer_name','staff_id','staff_name']} |
+            dict(visit_date=day,customer_type=kind,completed_visits=1,returning_visits=int(prior),
+                 first_completed_visit_date=master_first,classification_basis='master first visit plus observed completed booking history'))
     frames={}
     for name,records in rows.items():
         if name in VIEW_MODULES and not enabled(intake,VIEW_MODULES[name]):continue
