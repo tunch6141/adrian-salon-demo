@@ -5,12 +5,12 @@ from datetime import date
 from datetime import timedelta
 from analyst_engine import QueryBlocked
 from analytics.diagnostics import calendar_periods
-from .models import Step, Audit, Scope
+from .models import Step, Audit, Scope, Conclusion
 from .contract import CONTRACT, DATA_DEFINITIONS, AUDIT
 from .evidence import TOOLS, execute, validate_answer, statements
 
 ANSWER_RELEASE='21 Sep 2026 · Stage 1 commercial reasoning'
-MAX_STEPS=4
+MAX_STEPS=5
 MAX_TOOLS=9
 
 
@@ -61,7 +61,15 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
                        remaining_steps=MAX_STEPS-round_index-1,remaining_tools=MAX_TOOLS-tool_count)
         if step:payload['current_investigation']=step.model_dump(exclude={'final'})
         previous_scope=step.scope.model_dump() if step else (state or {}).get('scope')
-        try:step=model_call(client,model,Step,CONTRACT+'\n'+DATA_DEFINITIONS,payload,stats)
+        try:
+            if round_index>=3 and step:
+                finished=model_call(client,model,Conclusion,CONTRACT+'\n'+DATA_DEFINITIONS+
+                    '\nNOW RETURN ONLY A CONCLUSION. Evidence collection is finished. Preserve the established scope and review all contexts. '
+                    'Use short sentences with at most two numerical facts each and cite the exact cells for BOTH facts. '
+                    'Do not invent missing calculations; narrow the conclusion and recommend investigation where necessary. '
+                    'Correct every listed validation problem. An unproven owner premise must be challenged, not assumed.',payload,stats)
+                step=step.model_copy(update={'calls':[],'hypotheses':finished.hypotheses,'final':finished.final})
+            else:step=model_call(client,model,Step,CONTRACT+'\n'+DATA_DEFINITIONS,payload,stats)
         except Exception as exc:
             from pydantic import ValidationError
             if not isinstance(exc,ValidationError):raise
@@ -83,7 +91,7 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
         changed_context={c['id'] for c in new_context}!={c['id'] for c in contexts}
         contexts=new_context
         if step.calls:
-            if round_index==MAX_STEPS-1:
+            if round_index>=3:
                 errors=['Investigation limit reached; additional requested calculations were not run.'];break
             errors=[]
             for call in step.calls:
@@ -122,7 +130,9 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
             dict(question=question,active_state=state,scope=scope.model_dump(),hypotheses=[h.model_dump() for h in step.hypotheses],
                  answer=step.final.model_dump(),rendered_statements=list(rendered.values()),results=results,contexts=contexts,trace=trace),stats)
         if not audit.approved:
-            errors=audit.problems;continue
+            errors=audit.problems
+            payload['rejected_answer']=step.final.model_dump()
+            continue
         answer=step.final;status='answered';errors=[];break
     scope=step.scope.model_dump() if step else {}
     saved_state=dict(scope=scope,last_question=question,snapshot_id=db.intake.revision,
@@ -134,6 +144,7 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
         answer=answer.model_dump() if answer else None,results=results,contexts=contexts,issues=errors,
         execution_trace=trace,analytical_state=saved_state,
         hypothesis_tests=[h.model_dump() for h in step.hypotheses] if step else [],
+        candidate_answer=step.final.model_dump() if step and step.final else None,
         reporting_date=db.intake.asof.date().isoformat(),
         timing=dict(total_seconds=round(time.monotonic()-started,2),calls=stats))
     if answer:

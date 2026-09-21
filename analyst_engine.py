@@ -111,7 +111,8 @@ class Database:
             for c in frame:
                 if pd.api.types.is_datetime64_any_dtype(frame[c]):
                     frame[c]=frame[c].dt.strftime('%Y-%m-%d %H:%M:%S').where(frame[c].notna(),None)
-            frame.to_sql(name,self.con,index=False)
+            text_types={c:'TEXT COLLATE NOCASE' for c in frame if pd.api.types.is_object_dtype(frame[c]) or pd.api.types.is_string_dtype(frame[c])}
+            frame.to_sql(name,self.con,index=False,dtype=text_types)
             self.schema[name]=list(frame.columns)
         self.con.execute('PRAGMA query_only=ON')
         self.con.setlimit(sqlite3.SQLITE_LIMIT_LENGTH,1000000)

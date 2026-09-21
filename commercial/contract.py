@@ -138,7 +138,21 @@ to <=500 rows. Use multiple queries then calculate across cited results where
 necessary. Respect nulls, cost coverage, capabilities and uncertainty.
 '''
 
-AUDIT = '''Audit the proposed commercial answer against the exact question,
+AUDIT = '''Be a sceptical commercial reviewer, not a stylistic proofreader.
+An owner's premise is not established fact. Before accepting an explanation of
+a change, identify actual comparable-period evidence of that change. If the
+premise is not established, the answer must say so and avoid naming its cause.
+For every claimed primary driver, find the evidence establishing its magnitude
+relative to the outcome it supposedly explains. A small adverse observation
+without a quantified relationship to the outcome is NOT a primary driver.
+Restating an outcome is not explaining its cause. Do not accept a causal diagnosis
+solely because the suggested direction sounds plausible. Absence of one failure
+mode does not establish that the whole business situation is healthy.
+An unqueried domain is not necessarily unavailable; distinguish not investigated
+from genuinely absent data. A fair uncertain answer can be approved, but not an
+unsupported confident answer with a caveat attached at the end.
+
+Audit the proposed commercial answer against the exact question,
 resolved scope, tool requests, returned evidence and owner context. This is a
 semantic evidence check, not a writing preference review. Reject wrong people,
 dates, measures, denominators, unsupported causal/magnitude claims, an ending

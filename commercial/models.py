@@ -105,3 +105,8 @@ class Step(BaseModel):
 class Audit(BaseModel):
     approved: bool
     problems: list[str] = Field(max_length=6)
+
+
+class Conclusion(BaseModel):
+    hypotheses: list[Hypothesis] = Field(max_length=4)
+    final: Diagnosis

@@ -48,17 +48,17 @@ def execute(db,call,results):
         if any(type(v) not in (int,float) for v in values.values()):raise QueryBlocked('Arithmetic inputs must be known numeric evidence.')
         value=arithmetic(call.expression,values)
         return [packet(db.intake,'calculated_relationship',[{'label':call.label,'value':value}],call.expression+'; '+str([r.model_dump() for r in call.inputs]))]
+    names={str(r['staff_id']):r['staff_name'] for r in db.intake.tables.get('staff',[])}
+    staff=[names.get(s,s) for s in call.staff]
     if call.kind=='staff_performance':
-        people=db.intake.tables.get('staff',[])
-        names={str(r['staff_id']):r['staff_name'] for r in people}
-        staff=[names.get(s,s) for s in call.staff] if call.staff else list(names.values())
+        staff=staff or list(names.values())
         if call.comparison_start or call.comparison_end:
             return period_diagnostic(db,staff,call.start_date,call.end_date,call.comparison_start,call.comparison_end,call.comparison_divisor)
         return staff_diagnostic(db,staff,call.start_date,call.end_date)
     if call.kind=='revenue_total':
         if call.comparison_start or call.comparison_end:raise QueryBlocked('revenue_total returns one period only. Use separate calls for each period, or revenue_trend for several periods.')
-        return revenue_diagnostic(db,call.staff,call.start_date,call.end_date)
-    if call.kind=='revenue_trend':return revenue_trend(db,call.staff,call.start_date,call.end_date,call.grain,call.category)
+        return revenue_diagnostic(db,staff,call.start_date,call.end_date)
+    if call.kind=='revenue_trend':return revenue_trend(db,staff,call.start_date,call.end_date,call.grain,call.category)
     raise QueryBlocked('Unknown evidence tool.')
 
 
@@ -82,32 +82,40 @@ def render_statement(statement,results,scope):
     # cell. Derived amounts must first be calculated. The independent audit checks
     # that citations support the entire meaning, units, scope and comparison.
     literal=re.sub(r'\[\[.*?\]\]','',text)
-    validate_claim_numbers(results,dict(text=literal,evidence=refs),statement.context_ids,[scope.start_date,scope.end_date])
+    try:validate_claim_numbers(results,dict(text=literal,evidence=refs),statement.context_ids,[scope.start_date,scope.end_date])
+    except QueryBlocked as exc:
+        raise QueryBlocked(f'{exc} Sentence: {text!r}; cited values: {values!r}. Cite each displayed value, or omit an uncomputed number.') from exc
     return re.sub(r'\[\[(.*?)\]\]',lambda m:slots[m.group(1)],text)
 
 
 def validate_answer(answer,results,contexts,scope,hypotheses,intent):
+    problems=[]
     ids={c['id'] for c in contexts}
-    if {c.context_id for c in answer.context_review}!=ids:raise QueryBlocked('Review every retrieved owner context note before finalising.')
+    if {c.context_id for c in answer.context_review}!=ids:problems.append('Review every retrieved owner context note: '+', '.join(sorted(ids)))
     if answer.next_step_kind=='action':
         if not answer.primary_driver or answer.primary_driver.level=='unverified_possibility' or answer.confidence in ['possible explanation','insufficient evidence']:
-            raise QueryBlocked('An action requires a supported primary diagnosis; otherwise recommend investigation.')
+            problems.append('An action requires a supported primary diagnosis; otherwise recommend investigation.')
     if intent=='analysis':
-        if not hypotheses:raise QueryBlocked('An analytical diagnosis needs tested competing explanations.')
+        if not hypotheses:problems.append('Retain the hypotheses tested during investigation; qualify unsupported explanations as inconclusive.')
         # Alternatives may be supported contributors or inconclusive, not necessarily contradicted.
         # The semantic audit checks whether the evidence justifies the confidence and mechanism.
     for h in hypotheses:
-        if h.status in ['supported','contradicted'] and not h.evidence:raise QueryBlocked('A tested hypothesis needs evidence.')
-        for ref in h.evidence:reference_value(results,ref.model_dump())
+        if h.status in ['supported','contradicted'] and not h.evidence:problems.append('A tested hypothesis needs evidence: '+h.explanation)
+        for ref in h.evidence:
+            try:reference_value(results,ref.model_dump())
+            except QueryBlocked as exc:problems.append(f'{exc}: hypothesis {h.explanation!r}, reference {ref.model_dump()}')
     rendered={}
     for s in statements(answer):
-        if not set(s.context_ids)<=ids:raise QueryBlocked('Unknown context reference.')
-        if s.level!='unverified_possibility' and not (s.evidence or s.context_ids):raise QueryBlocked('Observed facts and interpretations need evidence.')
-        rendered[id(s)]=render_statement(s,results,scope)
+        if not set(s.context_ids)<=ids:problems.append('Unknown context reference: '+s.text)
+        if s.level!='unverified_possibility' and not (s.evidence or s.context_ids):problems.append('Observed facts and interpretations need evidence: '+s.text)
+        try:rendered[id(s)]=render_statement(s,results,scope)
+        except QueryBlocked as exc:problems.append(f'{exc}; statement references: {[r.model_dump() for r in s.evidence]}')
     for index in answer.table_results:
-        if index<0 or index>=len(results):raise QueryBlocked('Selected table does not exist.')
+        if index<0 or index>=len(results):problems.append(f'Table result index {index} does not exist. Use zero-based result_index, not a row value.')
     visual=answer.visual.model_dump()
-    validate_chart(results,visual)
+    try:validate_chart(results,visual)
+    except QueryBlocked as exc:problems.append(str(exc))
+    if problems:raise QueryBlocked('\n'.join(problems[:8]))
     if visual['kind']=='pie':
         rows=results[visual['result']]['rows']
         if len({str(r[visual['x']]) for r in rows})>6:raise QueryBlocked('Use a bar for more than six composition categories.')

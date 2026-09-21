@@ -77,6 +77,46 @@ def test_no_current_citations_means_no_invented_answer():
     with pytest.raises(QueryBlocked):validate_answer(answer(),[],[],scope(),[],'lookup')
 
 
+def test_numeric_prose_accepts_rounding_but_rejects_uncomputed_amounts():
+    from commercial.evidence import render_statement
+    statement=Statement(text='Revenue is AUD 123.46.',evidence=[dict(result=0,row=0,column='revenue')],level='observed')
+    results=[dict(rows=[dict(revenue=123.456)])]
+    assert render_statement(statement,results,scope())=='Revenue is AUD 123.46.'
+    statement.text='The difference is AUD 100.00.'
+    with pytest.raises(QueryBlocked):render_statement(statement,results,scope())
+    statement.text='Revenue [[0,row:0,column:revenue]].'
+    with pytest.raises(QueryBlocked,match='placeholder'):render_statement(statement,results,scope())
+
+
+def test_revenue_tools_resolve_the_same_staff_ids_as_performance():
+    from commercial.evidence import execute
+    db=Database.from_intake(load_snapshot(),rules_override='')
+    try:
+        person=db.intake.tables['staff'][0]
+        for kind in ['revenue_total','revenue_trend']:
+            result=execute(db,ToolCall(kind=kind,purpose='Read selected staff revenue',staff=[person['staff_id']],start_date='2026-08-01',end_date='2026-08-31'),[])
+            assert result[0]['rows'][0]['staff_name']==person['staff_name']
+    finally:db.close()
+
+
+def test_reserved_conclusion_after_evidence_budget_and_case_insensitive_status():
+    from commercial.models import Conclusion
+    db=Database.from_intake(load_snapshot(),rules_override='')
+    try:
+        lower=db.query("SELECT COUNT(*) AS count FROM booking_records WHERE status='completed'")['rows'][0]['count']
+        upper=db.query("SELECT COUNT(*) AS count FROM booking_records WHERE status='Completed'")['rows'][0]['count']
+        assert lower==upper and lower>0
+        steps=[]
+        for month in ['05','06','08']:
+            call=ToolCall(kind='sql',purpose='Investigate',sql=f"SELECT SUM(net_revenue) AS revenue FROM financial_lines WHERE posted_date LIKE '2026-{month}-%'")
+            steps.append(Step(intent='lookup',topic_relation='new',scope=scope(),hypotheses=[],calls=[call],final=None,draft=None,clarification='',unresolved=[]))
+        with patch('commercial.runtime.model_call',side_effect=steps+[Conclusion(hypotheses=[],final=answer()),Audit(approved=True,problems=[])]) as mocked:
+            result=investigate(None,'gpt-4.1-mini',db,'Read revenue',[],ContextStore())
+        assert result['status']=='answered' and mocked.call_args_list[3].args[2] is Conclusion
+        assert len(result['execution_trace'])==3
+    finally:db.close()
+
+
 def test_live_tool_protocol_and_grouped_cost_coverage():
     from commercial.evidence import execute
     db=Database.from_intake(load_snapshot(),rules_override='')
