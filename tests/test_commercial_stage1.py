@@ -5,7 +5,7 @@ import pytest
 from analyst_engine import Database, QueryBlocked
 from analytics.runtime import load_snapshot
 from business_context import ContextStore
-from commercial.models import Scope, Step, Diagnosis, Statement, Visual, Audit, ToolCall
+from commercial.models import Scope, Step, Diagnosis, Statement, Visual, Audit, ToolCall, Conclusion, EvidenceAssessment
 from commercial.runtime import investigate, resolve_scope
 from commercial.evidence import arithmetic, validate_answer
 
@@ -37,6 +37,10 @@ def answer(**kwargs):
     return Diagnosis(**(base|kwargs))
 
 
+def assessment():
+    return EvidenceAssessment(outcome_status='factual_lookup',outcome_check='Requested value was retrieved.',supported_relationships=['Result 0 contains the requested amount.'],established_driver=None,unsupported_claims=[],next_evidence=[])
+
+
 def test_action_and_composition_require_support():
     results=[dict(rows=[dict(revenue=990)])]
     with pytest.raises(QueryBlocked,match='supported primary'):
@@ -61,7 +65,7 @@ def test_real_data_lookup_audited_and_state_saved_without_legacy_rules():
     call=ToolCall(kind='sql',purpose='Measure requested product revenue',sql="SELECT SUM(net_revenue) AS revenue FROM financial_lines WHERE staff_name='Sam' AND item_type='product' AND posted_date BETWEEN '2026-05-01' AND '2026-08-31'")
     first=Step(intent='lookup',topic_relation='new',scope=scope(),hypotheses=[],calls=[call],final=None,draft=None,clarification='',unresolved=[])
     last=first.model_copy(deep=True);last.calls=[];last.final=answer();last.topic_relation='continue'
-    responses=[first,last,Audit(approved=True,problems=[])]
+    responses=[first,last,assessment(),Conclusion(hypotheses=[],final=answer()),Audit(approved=True,problems=[])]
     try:
         with patch('commercial.runtime.model_call',side_effect=responses) as mock:
             result=investigate(None,'gpt-4.1-mini',db,'Show product revenue',[],ContextStore())
@@ -70,6 +74,9 @@ def test_real_data_lookup_audited_and_state_saved_without_legacy_rules():
         for c in mock.call_args_list:
             assert 'NEVER SEND THIS TO MODEL' not in str(c)
         assert len(result['execution_trace'])==1
+        assessment_call=mock.call_args_list[2]
+        assert 'answer' not in assessment_call.args[4] and 'hypotheses' not in assessment_call.args[4]
+        assert result['evidence_assessment']['established_driver'] is None
     finally:db.close()
 
 
@@ -144,9 +151,10 @@ def test_reserved_conclusion_after_evidence_budget_and_case_insensitive_status()
         for month in ['05','06','08']:
             call=ToolCall(kind='sql',purpose='Investigate',sql=f"SELECT SUM(net_revenue) AS revenue FROM financial_lines WHERE posted_date LIKE '2026-{month}-%'")
             steps.append(Step(intent='lookup',topic_relation='new',scope=scope(),hypotheses=[],calls=[call],final=None,draft=None,clarification='',unresolved=[]))
-        with patch('commercial.runtime.model_call',side_effect=steps+[Conclusion(hypotheses=[],final=answer()),Audit(approved=True,problems=[])]) as mocked:
+        with patch('commercial.runtime.model_call',side_effect=steps+[assessment(),Conclusion(hypotheses=[],final=answer()),Audit(approved=True,problems=[])]) as mocked:
             result=investigate(None,'gpt-4.1-mini',db,'Read revenue',[],ContextStore())
-        assert result['status']=='answered' and mocked.call_args_list[3].args[2] is Conclusion
+        assert result['status']=='answered' and mocked.call_args_list[3].args[2] is EvidenceAssessment
+        assert mocked.call_args_list[4].args[2] is Conclusion
         assert len(result['execution_trace'])==3
     finally:db.close()
 

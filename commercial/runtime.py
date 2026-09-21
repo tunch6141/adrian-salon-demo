@@ -5,8 +5,8 @@ from datetime import date
 from datetime import timedelta
 from analyst_engine import QueryBlocked
 from analytics.diagnostics import calendar_periods
-from .models import Step, Audit, Scope, Conclusion
-from .contract import CONTRACT, DATA_DEFINITIONS, AUDIT
+from .models import Step, Audit, Scope, Conclusion, EvidenceAssessment
+from .contract import CONTRACT, DATA_DEFINITIONS, AUDIT, ASSESS, WRITE
 from .evidence import TOOLS, execute, validate_answer, statements
 
 ANSWER_RELEASE='21 Sep 2026 · Stage 1 commercial reasoning'
@@ -48,13 +48,16 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
         state={**state,'findings':[],'hypotheses':[],'unresolved':['Data changed; recheck previous findings.']}
     calendar=calendar_periods(db.intake)
     today=db.intake.asof.date();monday=today-timedelta(days=today.weekday())
+    previous_month_end=today.replace(day=1)-timedelta(days=1)
+    previous_matched_end=previous_month_end.replace(day=min(today.day,previous_month_end.day))
     calendar.update(current_month_elapsed=[str(today.replace(day=1)),str(today)],
+                    previous_month_matched_elapsed=[str(previous_month_end.replace(day=1)),str(previous_matched_end)],
                     next_week=[str(monday+timedelta(days=7)),str(monday+timedelta(days=13))])
     payload=dict(question=question,active_state=state,schema=db.schema,tools=TOOLS,
         reporting_calendar=calendar,
         available_staff=[dict(staff_id=r['staff_id'],staff_name=r['staff_name']) for r in db.intake.tables.get('staff',[])],
         data_quality={'unresolved_issues':len(db.intake.issues),'snapshot_id':db.intake.revision})
-    step=None;answer=None;rendered={};status='facts_only';tool_count=0
+    step=None;answer=None;rendered={};status='facts_only';tool_count=0;assessment=None
     for round_index in range(MAX_STEPS):
         stage('Understanding the business question' if round_index==0 else 'Testing the commercial explanation')
         payload.update(results=[dict(r,result_index=i,rows=[dict(row,row_index=j) for j,row in enumerate(r['rows'])]) for i,r in enumerate(results)],contexts=contexts,execution_trace=trace,validation_feedback=errors,
@@ -62,12 +65,12 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
         if step:payload['current_investigation']=step.model_dump(exclude={'final'})
         previous_scope=step.scope.model_dump() if step else (state or {}).get('scope')
         try:
-            if round_index>=3 and step:
-                finished=model_call(client,model,Conclusion,CONTRACT+'\n'+DATA_DEFINITIONS+
-                    '\nNOW RETURN ONLY A CONCLUSION. Evidence collection is finished. Preserve the established scope and review all contexts. '
-                    'Use short sentences with at most two numerical facts each and cite the exact cells for BOTH facts. '
-                    'Do not invent missing calculations; narrow the conclusion and recommend investigation where necessary. '
-                    'Correct every listed validation problem. An unproven owner premise must be challenged, not assumed.',payload,stats)
+            if (round_index>=3 or assessment is not None) and step:
+                if assessment is None:
+                    assessment=model_call(client,model,EvidenceAssessment,ASSESS+'\n'+DATA_DEFINITIONS,
+                        dict(question=question,active_scope=step.scope.model_dump(),results=payload['results'],contexts=contexts,trace=trace),stats)
+                payload['independent_evidence_assessment']=assessment.model_dump()
+                finished=model_call(client,model,Conclusion,WRITE+'\n'+DATA_DEFINITIONS,payload,stats)
                 step=step.model_copy(update={'calls':[],'hypotheses':finished.hypotheses or step.hypotheses,'final':finished.final})
             else:step=model_call(client,model,Step,CONTRACT+'\n'+DATA_DEFINITIONS,payload,stats)
         except Exception as exc:
@@ -119,19 +122,25 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
             errors=['Provide a supported answer or request necessary evidence.'];continue
         if changed_context:
             errors=['New matching owner context was retrieved. Review it before finalising.'];continue
+        if assessment is None:
+            assessment=model_call(client,model,EvidenceAssessment,ASSESS+'\n'+DATA_DEFINITIONS,
+                dict(question=question,active_scope=scope.model_dump(),results=payload['results'],contexts=contexts,trace=trace),stats)
+            errors=['Write the answer from the independent evidence assessment.'];continue
+        errors=[]
+        if assessment.established_driver is None and step.final.primary_driver is not None:
+            errors.append('The independent evidence assessment established no primary driver. Set primary_driver=null and do not assert a cause elsewhere.')
         try:
             rendered=validate_answer(step.final,results,contexts,scope,step.hypotheses,step.intent)
         except QueryBlocked as exc:
-            errors=[str(exc)]
-            payload['rejected_answer']=step.final.model_dump()
-            continue
+            errors.append(str(exc))
         stage('Checking the diagnosis against the evidence')
         audit=model_call(client,model,Audit,AUDIT+'\n'+DATA_DEFINITIONS,
             dict(question=question,active_state=state,scope=scope.model_dump(),hypotheses=[h.model_dump() for h in step.hypotheses],
-                 answer=step.final.model_dump(),rendered_statements=list(rendered.values()),results=results,contexts=contexts,trace=trace),stats)
+                 answer=step.final.model_dump(),independent_evidence_assessment=assessment.model_dump(),results=results,contexts=contexts,trace=trace),stats)
         audit_reviews.append(audit.model_dump())
         if not audit.approved:
-            errors=audit.problems
+            errors+=audit.problems
+        if errors:
             payload['rejected_answer']=step.final.model_dump()
             continue
         answer=step.final;status='answered';errors=[];break
@@ -146,6 +155,7 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
         execution_trace=trace,analytical_state=saved_state,
         hypothesis_tests=[h.model_dump() for h in step.hypotheses] if step else [],
         candidate_answer=step.final.model_dump() if step and step.final else None,audit_reviews=audit_reviews,
+        evidence_assessment=assessment.model_dump() if assessment else None,
         reporting_date=db.intake.asof.date().isoformat(),
         timing=dict(total_seconds=round(time.monotonic()-started,2),calls=stats))
     if answer:

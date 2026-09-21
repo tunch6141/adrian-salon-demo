@@ -114,3 +114,12 @@ class Audit(BaseModel):
 class Conclusion(BaseModel):
     hypotheses: list[Hypothesis] = Field(max_length=4)
     final: Diagnosis
+
+
+class EvidenceAssessment(BaseModel):
+    outcome_status: Literal['established','contradicted','not_comparable','not_established','factual_lookup']
+    outcome_check: str = Field(description='Check the actual requested outcome, including period, measure and denominator. Do not substitute a related outcome.')
+    supported_relationships: list[str] = Field(max_length=4, description='Only relationships established by returned evidence. Cite result indexes in the text. No invented benchmark or calculation.')
+    established_driver: str | None = Field(description='A mechanism that materially explains the requested outcome, or null. An amount without a comparator/target does not establish that it is too high or low.')
+    unsupported_claims: list[str] = Field(max_length=6)
+    next_evidence: list[str] = Field(max_length=3)
