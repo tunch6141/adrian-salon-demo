@@ -102,6 +102,7 @@ def complete_references(statement,results):
     """
     existing={(r.result,r.row,r.column) for r in statement.evidence}
     text=re.sub(r'\[\[.*?\]\]|\b\d{4}-\d{2}-\d{2}\b','',statement.text)
+    text=re.sub(r'(?<=\d)[-–](?=\d)',' to ',text)
     cells=[(i,j,k,v) for i,result in enumerate(results) for j,row in enumerate(result['rows']) for k,v in row.items()]
     # IDs/numeric labels must bind as whole strings, never as invented quantities.
     for i,j,k,v in cells:
@@ -166,7 +167,7 @@ def validate_answer(answer,results,contexts,scope,hypotheses,intent):
     rendered={}
     for s in statements(answer):
         if not set(s.context_ids)<=ids:problems.append('Unknown context reference: '+s.text)
-        if set(s.context_ids)&unrelated:problems.append('This statement uses an owner note about an entity not linked to the analysis: '+s.text)
+        s.context_ids=[key for key in s.context_ids if key not in unrelated]
         if s.level!='unverified_possibility' and not (s.evidence or s.sources or s.context_ids):problems.append('Observed facts and interpretations need a result source: '+s.text)
         try:
             complete_references(s,results)

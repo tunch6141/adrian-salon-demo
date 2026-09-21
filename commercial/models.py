@@ -105,6 +105,8 @@ class Step(BaseModel):
 
 
 class Audit(BaseModel):
+    premise_check: str = Field(default='',description='Brief evidence-based check of whether the claimed outcome/change is established, or correctly stated as unproven.')
+    mechanism_check: str = Field(default='',description='Brief check of quantitative explanatory mechanism and magnitude. A restatement of the outcome is not its cause. For a lookup, explain that causal diagnosis is not requested.')
     approved: bool
     problems: list[str] = Field(max_length=6)
 

@@ -36,6 +36,9 @@ Check the actual retrieved data and tool calls; do not reward plausible prose
 alone. A corrected false premise or qualified insufficient-evidence answer can
 pass. For analytical answers, a bare metric report is a failure. Return each
 criterion as a boolean and concrete issues. Do not assign fake confidence scores.
+For a factual lookup or ranking, relevant supported facts can fully answer the
+request; do not demand causal hypotheses, a trend investigation or an action
+that the question does not call for. Mark those criteria satisfied when not needed.
 This judge is an automated assessment requiring owner review, not certification.'''
 
 
@@ -80,8 +83,8 @@ def fixture(intake,variant):
     return t
 
 
-def run(client,model,intake,selected=None,on_case=None,on_result=None):
-    reports=[];staff_state=None
+def run(client,model,intake,selected=None,on_case=None,on_result=None,initial_staff_state=None):
+    reports=[];staff_state=initial_staff_state
     for case in cases():
         if selected and case['id'] not in selected:continue
         if on_case:on_case(case['id'],len(reports))

@@ -261,6 +261,7 @@ def validate_claim_numbers(results,claim,context_ids,periods,allow_magnitude=Fal
         if period:
             values.extend(float(n) for n in re.findall(r'\d+',period))
     text=re.sub(r'\b\d{4}-\d{2}-\d{2}\b','',claim['text'])
+    text=re.sub(r'(?<=\d)[-–](?=\d)',' to ',text)
     numbers=re.findall(r'(?<![A-Za-z])[-+]?\d[\d,]*(?:\.\d+)?',text)
     for token in numbers:
         n=float(token.replace(',',''))

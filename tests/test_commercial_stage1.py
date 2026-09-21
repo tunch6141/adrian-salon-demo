@@ -109,6 +109,10 @@ def test_result_citations_verify_numbers_without_model_cell_addresses():
     with pytest.raises(QueryBlocked):render_statement(statement,results,scope())
     statement.text='Revenue was 2.6% lower.'
     assert render_statement(statement,[dict(rows=[dict(percentage_change=-2.62295)])],scope())==statement.text
+    statement.text='The range is 6-18.'
+    assert render_statement(statement,[dict(rows=[dict(low=6,high=18)])],scope())==statement.text
+    statement.text='The amount is -18.'
+    with pytest.raises(QueryBlocked):render_statement(statement,[dict(rows=[dict(amount=18)])],scope())
 
 
 def test_unrelated_entity_note_is_reviewed_but_not_displayed():
