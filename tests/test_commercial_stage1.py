@@ -111,6 +111,13 @@ def test_result_citations_verify_numbers_without_model_cell_addresses():
     assert render_statement(statement,[dict(rows=[dict(percentage_change=-2.62295)])],scope())==statement.text
 
 
+def test_unrelated_entity_note_is_reviewed_but_not_displayed():
+    a=answer(context_review=[dict(context_id='note',relevance='relevant',interpretation='About pricing')])
+    contexts=[dict(id='note',entity='Customer C90',customer_id='C90')]
+    validate_answer(a,[dict(rows=[dict(revenue=90,staff_name='Sam')])],contexts,scope(),[],'lookup')
+    assert a.context_review[0].relevance=='not_relevant'
+
+
 def test_revenue_tools_resolve_the_same_staff_ids_as_performance():
     from commercial.evidence import execute
     db=Database.from_intake(load_snapshot(),rules_override='')

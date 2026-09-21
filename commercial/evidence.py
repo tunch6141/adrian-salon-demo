@@ -129,6 +129,27 @@ def validate_answer(answer,results,contexts,scope,hypotheses,intent):
     if not ids:answer.context_review=[]  # There are no owner notes to review or display.
     reviewed={c.context_id for c in answer.context_review}
     if reviewed!=ids:problems.append(f'Context review must contain exactly these owner-note IDs: {sorted(ids)}. Remove unknown IDs {sorted(reviewed-ids)} and add missing IDs {sorted(ids-reviewed)}. Snapshot IDs and result IDs are not owner context. If there are no notes, return context_review=[].')
+    # Entity-specific context needs an evidenced connection to this investigation.
+    # Review all candidates, but don't display an unrelated entity's note merely
+    # because both concern business. No question keywords or benchmark entities.
+    observed={str(v).casefold() for result in results for row in result['rows'] for v in row.values() if isinstance(v,str)}
+    observed.update(str(v).casefold() for v in (scope.entities or []))
+    import sqlglot
+    from sqlglot import exp
+    for result in results:
+        try:tree=sqlglot.parse_one(result.get('sql',''),read='sqlite')
+        except Exception:continue
+        if tree is not None:observed.update(n.this.casefold() for n in tree.find_all(exp.Literal) if n.is_string)
+    unrelated=set()
+    notes={c['id']:c for c in contexts}
+    for review in answer.context_review:
+        note=notes.get(review.context_id)
+        if not note:continue
+        entity=str(note.get('customer_id') or note.get('entity','')).casefold()
+        if entity and entity not in {'salon','business','whole business'} and entity not in observed:
+            unrelated.add(review.context_id)
+            review.relevance='not_relevant'
+            review.interpretation='Reviewed; this entity has no established connection to the retrieved analysis scope.'
     if answer.next_step_kind=='action':
         if not answer.primary_driver or answer.primary_driver.level=='unverified_possibility' or answer.confidence in ['possible explanation','insufficient evidence']:
             problems.append('An action requires a supported primary diagnosis; otherwise recommend investigation.')
@@ -145,6 +166,7 @@ def validate_answer(answer,results,contexts,scope,hypotheses,intent):
     rendered={}
     for s in statements(answer):
         if not set(s.context_ids)<=ids:problems.append('Unknown context reference: '+s.text)
+        if set(s.context_ids)&unrelated:problems.append('This statement uses an owner note about an entity not linked to the analysis: '+s.text)
         if s.level!='unverified_possibility' and not (s.evidence or s.sources or s.context_ids):problems.append('Observed facts and interpretations need a result source: '+s.text)
         try:
             complete_references(s,results)
