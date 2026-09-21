@@ -116,7 +116,7 @@ class Database:
         self.con.execute('PRAGMA query_only=ON')
         self.con.setlimit(sqlite3.SQLITE_LIMIT_LENGTH,1000000)
         self.con.setlimit(sqlite3.SQLITE_LIMIT_SQL_LENGTH,12000)
-        functions={'sum','count','avg','min','max','round','coalesce','nullif','strftime','date','julianday','abs','lower','upper','substr','cast'}
+        functions={'sum','count','avg','min','max','round','coalesce','nullif','strftime','date','julianday','abs','lower','upper','substr','cast','like'}
         def authorizer(action,arg1,arg2,db,source):
             if action==sqlite3.SQLITE_SELECT:return sqlite3.SQLITE_OK
             if action==sqlite3.SQLITE_READ and arg1 in self.schema:return sqlite3.SQLITE_OK
@@ -163,10 +163,15 @@ class Database:
                 check=tree.copy()
                 check.set('expressions',[exp.Count(this=exp.Star()).as_('_rows'),exp.Count(this=exp.column(col)).as_('_known')])
                 check.set('order',None)
+                # Coverage is checked across the full filtered input. Original GROUP BY
+                # aliases no longer exist after replacing the projections above.
+                check.set('group',None)
+                check.set('having',None)
+                check.set('limit',None)
                 try:
                     coverage=self.con.execute(check.sql(dialect='sqlite')).fetchall()
                 except sqlite3.Error as exc:
-                    raise QueryBlocked('Cost coverage must be explicit before aggregating margin.') from exc
+                    raise QueryBlocked('Cost coverage check failed: '+str(exc)) from exc
                 if any(row[0]!=row[1] for row in coverage):
                     raise QueryBlocked('Cost coverage is incomplete. Show known and missing costs separately; a complete margin is unavailable.')
         cur=self.con.execute(sql)

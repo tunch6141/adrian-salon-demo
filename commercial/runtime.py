@@ -2,6 +2,7 @@
 import json
 import time
 from datetime import date
+from datetime import timedelta
 from analyst_engine import QueryBlocked
 from analytics.diagnostics import calendar_periods
 from .models import Step, Audit, Scope
@@ -24,7 +25,7 @@ def resolve_scope(patch,previous,relation):
 def model_call(client,model,schema,instructions,payload,stats):
     started=time.monotonic()
     result=client.responses.parse(model=model,instructions=instructions,input=json.dumps(payload,default=str),
-        text_format=schema,max_output_tokens=4500,store=False)
+        text_format=schema,max_output_tokens=4500,temperature=0.2,store=False)
     stats.append(dict(stage=schema.__name__,seconds=round(time.monotonic()-started,2),
         input_tokens=getattr(result.usage,'input_tokens',0),output_tokens=getattr(result.usage,'output_tokens',0)))
     if result.output_parsed is None:raise QueryBlocked('The model did not return a complete structured response.')
@@ -45,18 +46,27 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
     state=active_state or next((h['analytical_state'] for h in reversed(history) if h.get('analytical_state')),None)
     if state and state.get('snapshot_id')!=db.intake.revision:
         state={**state,'findings':[],'hypotheses':[],'unresolved':['Data changed; recheck previous findings.']}
+    calendar=calendar_periods(db.intake)
+    today=db.intake.asof.date();monday=today-timedelta(days=today.weekday())
+    calendar.update(current_month_elapsed=[str(today.replace(day=1)),str(today)],
+                    next_week=[str(monday+timedelta(days=7)),str(monday+timedelta(days=13))])
     payload=dict(question=question,active_state=state,schema=db.schema,tools=TOOLS,
-        reporting_calendar=calendar_periods(db.intake),
+        reporting_calendar=calendar,
         available_staff=[dict(staff_id=r['staff_id'],staff_name=r['staff_name']) for r in db.intake.tables.get('staff',[])],
         data_quality={'unresolved_issues':len(db.intake.issues),'snapshot_id':db.intake.revision})
     step=None;answer=None;rendered={};status='facts_only';tool_count=0
     for round_index in range(MAX_STEPS):
         stage('Understanding the business question' if round_index==0 else 'Testing the commercial explanation')
-        payload.update(results=results,contexts=contexts,execution_trace=trace,validation_feedback=errors,
+        payload.update(results=[dict(r,result_index=i) for i,r in enumerate(results)],contexts=contexts,execution_trace=trace,validation_feedback=errors,
                        remaining_steps=MAX_STEPS-round_index-1,remaining_tools=MAX_TOOLS-tool_count)
         if step:payload['current_investigation']=step.model_dump(exclude={'final'})
         previous_scope=step.scope.model_dump() if step else (state or {}).get('scope')
-        step=model_call(client,model,Step,CONTRACT+'\n'+DATA_DEFINITIONS,payload,stats)
+        try:step=model_call(client,model,Step,CONTRACT+'\n'+DATA_DEFINITIONS,payload,stats)
+        except Exception as exc:
+            from pydantic import ValidationError
+            if not isinstance(exc,ValidationError):raise
+            errors=['The response was incomplete. Return a compact valid Step with short statements and no repeated whitespace.']
+            continue
         try:step.scope=resolve_scope(step.scope,previous_scope,step.topic_relation if round_index==0 else 'continue')
         except QueryBlocked as exc:
             errors=[str(exc)];continue
@@ -104,7 +114,9 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
         try:
             rendered=validate_answer(step.final,results,contexts,scope,step.hypotheses,step.intent)
         except QueryBlocked as exc:
-            errors=[str(exc)];continue
+            errors=[str(exc)]
+            payload['rejected_answer']=step.final.model_dump()
+            continue
         stage('Checking the diagnosis against the evidence')
         audit=model_call(client,model,Audit,AUDIT+'\n'+DATA_DEFINITIONS,
             dict(question=question,active_state=state,scope=scope.model_dump(),hypotheses=[h.model_dump() for h in step.hypotheses],

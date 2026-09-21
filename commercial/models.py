@@ -14,9 +14,9 @@ class Scope(BaseModel):
 
 
 class Reference(BaseModel):
-    result: int = Field(ge=0)
-    row: int = Field(ge=0)
-    column: str
+    result: int = Field(ge=0, description='Zero-based result_index from supplied results. This is an ADDRESS, never the monetary value, count or result id.')
+    row: int = Field(ge=0, description='Zero-based index within that result rows array.')
+    column: str = Field(description='Exact column key of the cited cell in that row.')
     format: Literal['plain','money','percent'] = 'plain'
 
 
@@ -37,8 +37,8 @@ class Hypothesis(BaseModel):
 class ToolCall(BaseModel):
     kind: Literal['sql','staff_performance','revenue_total','revenue_trend','booking','calculate']
     purpose: str = Field(description='What uncertainty this calculation resolves; not a generic metric list')
-    sql: str = ''
-    staff: list[str] = Field(default_factory=list)
+    sql: str = Field(default='',description='Only kind=sql: one SQLite SELECT from one exact schema view. Never query a returned evidence packet as a SQL table.')
+    staff: list[str] = Field(default_factory=list,description='Exact staff names or IDs. Empty selects all staff for staff_performance; whole-business total for revenue tools.')
     start_date: str = ''
     end_date: str = ''
     comparison_start: str = ''
@@ -46,8 +46,8 @@ class ToolCall(BaseModel):
     comparison_divisor: int = 1
     category: Literal['all','service','product','part'] = 'all'
     grain: Literal['day','week','month'] = 'month'
-    identifier: str = ''
-    expression: str = Field(default='',description='For calculate: arithmetic using v0,v1... bound to references, + - * / and numeric constants. No functions/code.')
+    identifier: str = Field(default='',description='Only kind=booking: actual booking ID supplied by owner. Not a label for a query. Other tools leave empty.')
+    expression: str = Field(default='',description='For calculate: ONE scalar arithmetic expression using v0,v1... bound to inputs. + - * / and numeric constants. No tuples, commas, functions/code.')
     inputs: list[Reference] = Field(default_factory=list,max_length=12)
     label: str = ''
 

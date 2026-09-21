@@ -7,7 +7,7 @@ from analytics.diagnostics import packet, staff_diagnostic, period_diagnostic, r
 
 
 TOOLS = {
-    'sql':'Read one approved view at its declared grain; aggregate, filter and calculate in SQL.',
+    'sql':'One SQLite SELECT from a view listed in schema, using its exact columns. No joins/subqueries/UNION/windows. Separate calls for separate queries. strftime for month/year, never DATE_TRUNC or EXTRACT. Returned result packets are not SQL views.',
     'staff_performance':'Matched staff revenue, completed service hours, available capacity, utilisation, service mix and optional comparable-period changes. Explicit staff and dates required.',
     'revenue_total':'Inclusive-period posted net service, product, part and total revenue by requested staff or whole business.',
     'revenue_trend':'Calendar day/week/month revenue by category and staff, with exact totals, changes and partial-period coverage.',
@@ -39,17 +39,24 @@ def arithmetic(expression, values):
 
 def execute(db,call,results):
     if call.kind=='sql':return [db.query(call.sql)]
-    if call.kind=='booking':return booking_lookup(db,call.identifier)
+    if call.kind=='booking':
+        if call.sql:raise QueryBlocked('Use kind=sql to run SQL. booking only retrieves an actual booking ID.')
+        return booking_lookup(db,call.identifier)
     if call.kind=='calculate':
         values={f'v{i}':reference_value(results,r.model_dump()) for i,r in enumerate(call.inputs)}
         if any(type(v) not in (int,float) for v in values.values()):raise QueryBlocked('Arithmetic inputs must be known numeric evidence.')
         value=arithmetic(call.expression,values)
         return [packet(db.intake,'calculated_relationship',[{'label':call.label,'value':value}],call.expression+'; '+str([r.model_dump() for r in call.inputs]))]
     if call.kind=='staff_performance':
+        people=db.intake.tables.get('staff',[])
+        names={str(r['staff_id']):r['staff_name'] for r in people}
+        staff=[names.get(s,s) for s in call.staff] if call.staff else list(names.values())
         if call.comparison_start or call.comparison_end:
-            return period_diagnostic(db,call.staff,call.start_date,call.end_date,call.comparison_start,call.comparison_end,call.comparison_divisor)
-        return staff_diagnostic(db,call.staff,call.start_date,call.end_date)
-    if call.kind=='revenue_total':return revenue_diagnostic(db,call.staff,call.start_date,call.end_date)
+            return period_diagnostic(db,staff,call.start_date,call.end_date,call.comparison_start,call.comparison_end,call.comparison_divisor)
+        return staff_diagnostic(db,staff,call.start_date,call.end_date)
+    if call.kind=='revenue_total':
+        if call.comparison_start or call.comparison_end:raise QueryBlocked('revenue_total returns one period only. Use separate calls for each period, or revenue_trend for several periods.')
+        return revenue_diagnostic(db,call.staff,call.start_date,call.end_date)
     if call.kind=='revenue_trend':return revenue_trend(db,call.staff,call.start_date,call.end_date,call.grain,call.category)
     raise QueryBlocked('Unknown evidence tool.')
 
@@ -66,8 +73,8 @@ def validate_answer(answer,results,contexts,scope,hypotheses,intent):
             raise QueryBlocked('An action requires a supported primary diagnosis; otherwise recommend investigation.')
     if intent=='analysis':
         if not hypotheses:raise QueryBlocked('An analytical diagnosis needs tested competing explanations.')
-        if answer.primary_driver and answer.confidence=='strongly supported' and not any(h.status=='contradicted' for h in hypotheses):
-            raise QueryBlocked('Strong primary-driver confidence requires testing an alternative, not just confirming the first hypothesis.')
+        # Alternatives may be supported contributors or inconclusive, not necessarily contradicted.
+        # The semantic audit checks whether the evidence justifies the confidence and mechanism.
     for h in hypotheses:
         if h.status in ['supported','contradicted'] and not h.evidence:raise QueryBlocked('A tested hypothesis needs evidence.')
         for ref in h.evidence:reference_value(results,ref.model_dump())

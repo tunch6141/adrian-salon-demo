@@ -75,3 +75,29 @@ def test_real_data_lookup_audited_and_state_saved_without_legacy_rules():
 
 def test_no_current_citations_means_no_invented_answer():
     with pytest.raises(QueryBlocked):validate_answer(answer(),[],[],scope(),[],'lookup')
+
+
+def test_live_tool_protocol_and_grouped_cost_coverage():
+    from commercial.evidence import execute
+    db=Database.from_intake(load_snapshot(),rules_override='')
+    try:
+        people=db.intake.tables['staff']
+        r=execute(db,ToolCall(kind='staff_performance',purpose='Compare staff',staff=[people[0]['staff_id']],start_date='2026-08-01',end_date='2026-08-31'),[])
+        assert r[0]['rows'][0]['staff_name']==people[0]['staff_name']
+        r=db.query("SELECT strftime('%Y-%m',posted_date) AS month, SUM(gross_profit) AS profit FROM financial_lines WHERE posted_date BETWEEN '2026-08-01' AND '2026-08-31' GROUP BY month")
+        assert r['rows'][0]['profit']>0
+        assert db.query("SELECT item_name FROM inventory_coverage WHERE item_name LIKE '%shampoo%'")['rows']
+        with pytest.raises(QueryBlocked,match='one period'):
+            execute(db,ToolCall(kind='revenue_total',purpose='Compare',comparison_start='2026-07-01'),[])
+        with pytest.raises(QueryBlocked,match='kind=sql'):
+            execute(db,ToolCall(kind='booking',purpose='Count',sql='SELECT COUNT(*) FROM booking_records'),[])
+        # A null-cost line must still prevent a complete margin being reported.
+        from types import SimpleNamespace
+        import pandas as pd
+        small=Database.__new__(Database);small.intake=SimpleNamespace(revision='cost-test')
+        small._open_frames({'financial_lines':pd.DataFrame([{'posted_date':'2026-08-01','gross_profit':5},{'posted_date':'2026-08-02','gross_profit':None}])})
+        try:
+            with pytest.raises(QueryBlocked,match='incomplete'):
+                small.query("SELECT strftime('%Y-%m',posted_date) AS month, SUM(gross_profit) AS profit FROM financial_lines GROUP BY month")
+        finally:small.close()
+    finally:db.close()

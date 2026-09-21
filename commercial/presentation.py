@@ -15,6 +15,7 @@ def render_commercial(item,build_chart,safe_text):
     else:
         a=item['answer'];d=item['display']
         safe_text(d['direct_answer'])
+        st.caption('Evidence confidence: '+a['confidence'])
         for text in d['key_evidence']:safe_text(text)
         if d['primary_driver'] and d['primary_driver']!=d['direct_answer']:safe_text(d['primary_driver'])
         for text in d['secondary_drivers']:safe_text(text)
