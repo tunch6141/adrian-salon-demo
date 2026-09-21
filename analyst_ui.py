@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 from analyst_engine import Database, QueryBlocked, validate_chart
-from analyst_ai import investigate, ANSWER_RELEASE
+from commercial.runtime import investigate, ANSWER_RELEASE
 from business_context import ContextStore
 
 
@@ -98,7 +98,8 @@ def build_chart(df,chart):
     c=alt.Chart(df)
     tooltip=[alt.Tooltip(col,type='quantitative' if pd.api.types.is_numeric_dtype(df[col]) else 'nominal') for col in df.columns]
     if chart['kind']=='pie':
-        return c.mark_arc().encode(theta=alt.Theta(y,type='quantitative'),color=alt.Color(x,type='nominal'),tooltip=tooltip)
+        pie=c.mark_arc().encode(theta=alt.Theta(y,type='quantitative'),color=alt.Color(x,type='nominal'),tooltip=tooltip)
+        return pie.facet(column=alt.Column(series,type='nominal',title='Staff')) if series else pie
     c=(c.mark_line(point=True) if chart['kind']=='line' else c.mark_bar()).encode(x=alt.X(x,type='ordinal',sort=None),y=alt.Y(y,type='quantitative'),tooltip=tooltip)
     if series:
         c=c.encode(color=alt.Color(series,type='nominal',title='Staff' if series=='staff_name' else series))
@@ -106,8 +107,11 @@ def build_chart(df,chart):
     return c
 
 def render_result(item):
+    if item.get('engine')=='commercial_stage1':
+        from commercial.presentation import render_commercial
+        return render_commercial(item,build_chart,safe_text)
     status=item['status']
-    scope=item.get('plan',{}).get('diagnostic') or item.get('plan',{}).get('revenue') or item.get('plan',{}).get('trend')
+    scope=item.get('plan',{}).get('diagnostic') or item.get('plan',{}).get('revenue') or item.get('plan',{}).get('trend') or item.get('plan',{}).get('financial')
     if scope and item.get('reporting_date') and scope['start_date']<=item['reporting_date']<scope['end_date']:
         st.caption('Actual results are to date through '+item['reporting_date']+'; the requested period has not finished. Future bookings are scheduled, not completed revenue.')
     if status=='explanation':
@@ -151,7 +155,7 @@ def render_result(item):
             safe_text(claim['text'])
         if item['plan'].get('trend'):
             st.caption('Calendar periods are clipped to your requested dates. Partial first/last periods should not be compared with full periods.')
-        if item['plan'].get('customer') or item['plan'].get('booking_id') or item['plan'].get('trend') or (item['plan'].get('queries') and not item['plan'].get('diagnostic')):
+        if item['plan'].get('financial') or item['plan'].get('customer') or item['plan'].get('booking_id') or item['plan'].get('trend') or (item['plan'].get('queries') and not item['plan'].get('diagnostic')):
             for result in item['results']:
                 if result['table']=='approved_trend_totals':continue
                 frame=pd.DataFrame(result['rows'])
@@ -298,13 +302,15 @@ def render(t,setting):
         from analytics.runtime import CombinedContextStore
         store=CombinedContextStore(t,store)
     if not store.persistent:st.info('Context is session-only until Supabase is connected. It will not survive a reboot or a new browser session.')
-    revision=getattr(t,'revision','legacy')
+    revision=ANSWER_RELEASE+':'+getattr(t,'revision','legacy')
     if st.session_state.get('analyst_data_revision') != revision:
         st.session_state['v4_turns']=[]
+        st.session_state.pop('active_analytical_state',None)
         st.session_state['analyst_data_revision']=revision
     turns=st.session_state.setdefault('v4_turns',[])
     if st.button('New conversation'):
         st.session_state.v4_turns=[]
+        st.session_state.pop('active_analytical_state',None)
         st.session_state.pop('context_draft',None)
         st.session_state.pop('draft_id',None)
         st.rerun()
@@ -319,14 +325,16 @@ def render(t,setting):
         db=None
         try:
             with st.status('Investigating your question…',expanded=True) as progress:
-                db=Database.from_intake(t) if hasattr(t,'tables') else Database(t)
+                db=Database.from_intake(t,rules_override='Stage 1 uses commercial.contract data definitions.') if hasattr(t,'tables') else Database(t)
                 history=[{'question':x['question'],'plan':x['result']['plan'],'answer':x['result']['answer'],'status':x['result']['status'],
                     'resolved_records':[{k:row[k] for k in ['booking_id','customer_id','customer_name','appointment_date','first_completed_visit_date'] if k in row} for r in x['result']['results'] if r['table'] in ['booking_records','approved_customer_profile'] for row in r['rows'][:1]],
                     'issues':x['result'].get('issues',[]),'execution_notes':x['result'].get('execution_notes',[]),
                     'retrieved_scopes':[{'table':r['table'],'sql':r['sql']} for r in x['result']['results']]}
                     for x in turns[-5:]]
                 # History is only interpretation context; each answer retrieves fresh database evidence.
-                result=investigate(OpenAI(api_key=key,timeout=60,max_retries=0),model,db,question.strip(),history,store,on_stage=lambda stage: progress.update(label=stage))
+                result=investigate(OpenAI(api_key=key,timeout=60,max_retries=0),model,db,question.strip(),[],store,
+                    active_state=st.session_state.get('active_analytical_state'),on_stage=lambda stage: progress.update(label=stage))
+                if result['status']!='context':st.session_state.active_analytical_state=result['analytical_state']
                 result['dataset_version']=getattr(t,'version_id',t.revision)
                 st.session_state.v4_turns=(turns+[{'question':question.strip(),'result':result}])[-10:]
                 if result['status']=='context' and result['plan']['draft']:

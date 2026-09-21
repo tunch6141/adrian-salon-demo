@@ -2,7 +2,6 @@
 from pathlib import Path
 from unittest.mock import patch
 from streamlit.testing.v1 import AppTest
-from analyst_ai import Plan,Answer,Review
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -10,15 +9,23 @@ def test_app_uses_corrected_data_in_analytical_chat():
     app=AppTest.from_file(str(ROOT/'app.py'),default_timeout=60)
     app.secrets.update(DEMO_PASSWORD='test',OPENAI_API_KEY='fake-key',OPENAI_MODEL='mock-model')
     app.run();app.text_input(key='v4_password').set_value('test').run()
-    plan=Plan(intent='lookup',scope='Sarah net revenue 7 to 13 September',missing_information='',queries=["SELECT SUM(net_revenue) AS revenue FROM financial_lines WHERE staff_id='S01' AND posted_date BETWEEN '2026-09-07' AND '2026-09-13'"],context_entity='Sarah',context_start='2026-09-07',context_end='2026-09-13',draft=None)
-    answer=Answer(claims=[dict(text='Sarah recorded [[0]] net revenue.',evidence=[dict(result=0,row=0,column='revenue',format='money')],context_ids=[])],investigation='',recommendation='',measurement='',missing_information='',chart=dict(kind='none',result=0,x='',y=''))
-    with patch('openai.OpenAI',return_value=object()), patch('analyst_ai.structured',side_effect=[plan,answer,Review(approved=True,issues=[])]):
+    from commercial.models import Scope, Step, ToolCall, Diagnosis, Statement, Visual, Audit
+    from analytics.runtime import load_snapshot
+    scope=Scope(objective='Check revenue',subject='revenue',entities=['Sarah'],start_date='2026-09-07',end_date='2026-09-13',measures=['net_revenue'],category='all',display='text')
+    plan=Step(intent='lookup',topic_relation='new',scope=scope,hypotheses=[],calls=[ToolCall(kind='sql',purpose='Retrieve requested revenue',sql="SELECT SUM(net_revenue) AS revenue FROM financial_lines WHERE staff_id='S01' AND posted_date BETWEEN '2026-09-07' AND '2026-09-13'")],final=None,draft=None,clarification='',unresolved=[])
+    notes=[r for r in load_snapshot().contexts if r['entity'] in ['Sarah','Salon'] and r['end_date']>='2026-09-07' and r['start_date']<='2026-09-13']
+    final=Diagnosis(direct_answer=Statement(text='Sarah recorded [[0]] net revenue.',evidence=[dict(result=0,row=0,column='revenue',format='money')],level='observed'),key_evidence=[],primary_driver=None,secondary_drivers=[],alternatives=[],confidence='strongly supported',next_step_kind='none',next_step=None,visual=Visual(),table_results=[],context_review=[dict(context_id=r['id'],relevance='relevant',interpretation='Owner-reported context; does not change recorded revenue.') for r in notes],limitations='')
+    completed=plan.model_copy(deep=True);completed.calls=[];completed.final=final
+    with patch('openai.OpenAI',return_value=object()), patch('commercial.runtime.model_call',side_effect=[plan,completed,Audit(approved=True,problems=[])]):
         app.text_input[1].set_value('What was Sarah revenue for 7 to 13 September?')
         next(b for b in app.button if b.label=='Send question').click().run()
     assert not app.exception
-    assert app.session_state['v4_turns'][-1]['result']['status']=='answered'
-    assert '1,410.00' in app.session_state['v4_turns'][-1]['result']['answer']['claims'][0]['text']
-    assert any(r['id']=='CTX1' for r in app.session_state['v4_turns'][-1]['result']['contexts'])
+    result=app.session_state['v4_turns'][-1]['result']
+    assert result['status']=='answered'
+    assert '1,410.00' in result['display']['direct_answer']
+    assert any(r['id']=='CTX1' for r in result['contexts'])
+    assert app.session_state['active_analytical_state']['scope']['entities']==['Sarah']
+
 
 def test_validation_page_and_checkpoint_flow():
     app=AppTest.from_file(str(ROOT/'pages/1_Data_Validation.py'),default_timeout=60)

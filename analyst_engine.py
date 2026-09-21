@@ -92,12 +92,14 @@ class Database:
         self._open_frames(frames)
 
     @classmethod
-    def from_intake(cls, intake):
+    def from_intake(cls, intake, rules_override=None):
         from analytics.views import build_views
-        from analytics.rules import rules_for
         obj=cls.__new__(cls)
         obj.intake=intake
-        obj.rules=rules_for(intake)
+        if rules_override is None:
+            from analytics.rules import rules_for
+            obj.rules=rules_for(intake)
+        else:obj.rules=rules_override
         obj._open_frames(build_views(intake))
         return obj
 
