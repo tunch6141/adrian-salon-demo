@@ -3,6 +3,7 @@ import ast
 import math
 import operator
 import re
+from .models import Reference
 from analyst_engine import QueryBlocked, reference_value, validate_claim_numbers, validate_chart
 from analytics.diagnostics import packet, staff_diagnostic, period_diagnostic, revenue_diagnostic, revenue_trend, booking_lookup
 
@@ -88,6 +89,33 @@ def render_statement(statement,results,scope):
     return re.sub(r'\[\[(.*?)\]\]',lambda m:slots[m.group(1)],text)
 
 
+def complete_references(statement,results):
+    """Link omitted citations to existing exact cells, never create a calculation.
+
+    This only assists addressing. Semantic review must still validate scope,
+    units, interpretation and materiality; a matching number is not proof.
+    Broadly ambiguous matches remain a validation failure for the model to fix.
+    """
+    existing={(r.result,r.row,r.column) for r in statement.evidence}
+    text=re.sub(r'\[\[.*?\]\]|\b\d{4}-\d{2}-\d{2}\b','',statement.text)
+    cells=[(i,j,k,v) for i,result in enumerate(results) for j,row in enumerate(result['rows']) for k,v in row.items()]
+    # IDs/numeric labels must bind as whole strings, never as invented quantities.
+    for i,j,k,v in cells:
+        if isinstance(v,str) and re.search(r'\d',v) and len(v)<=80 and re.search(r'(?<!\w)'+re.escape(v)+r'(?!\w)',text):
+            if (i,j,k) not in existing and len(statement.evidence)<32:
+                statement.evidence.append(Reference(result=i,row=j,column=k));existing.add((i,j,k))
+    cited=[reference_value(results,r.model_dump()) for r in statement.evidence]
+    for token in re.findall(r'(?<![A-Za-z])[-+]?\d[\d,]*(?:\.\d+)?',text):
+        number=float(token.replace(',',''));decimals=len(token.split('.')[1]) if '.' in token else 0
+        tolerance=0.5*10**(-decimals)+1e-8
+        if any(type(v) in (int,float) and abs(v-number)<tolerance for v in cited):continue
+        matches=[(i,j,k) for i,j,k,v in cells if type(v) in (int,float) and abs(v-number)<tolerance]
+        if 0<len(matches)<=8 and len(existing|set(matches))<=32:
+            for i,j,k in matches:
+                if (i,j,k) not in existing:
+                    statement.evidence.append(Reference(result=i,row=j,column=k));existing.add((i,j,k))
+
+
 def validate_answer(answer,results,contexts,scope,hypotheses,intent):
     problems=[]
     ids={c['id'] for c in contexts}
@@ -108,7 +136,9 @@ def validate_answer(answer,results,contexts,scope,hypotheses,intent):
     for s in statements(answer):
         if not set(s.context_ids)<=ids:problems.append('Unknown context reference: '+s.text)
         if s.level!='unverified_possibility' and not (s.evidence or s.context_ids):problems.append('Observed facts and interpretations need evidence: '+s.text)
-        try:rendered[id(s)]=render_statement(s,results,scope)
+        try:
+            complete_references(s,results)
+            rendered[id(s)]=render_statement(s,results,scope)
         except QueryBlocked as exc:problems.append(f'{exc}; statement references: {[r.model_dump() for r in s.evidence]}')
     for index in answer.table_results:
         if index<0 or index>=len(results):problems.append(f'Table result index {index} does not exist. Use zero-based result_index, not a row value.')

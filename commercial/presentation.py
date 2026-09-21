@@ -11,7 +11,6 @@ def render_commercial(item,build_chart,safe_text):
     elif status=='clarify':safe_text(item['plan']['missing_information'])
     elif status!='answered':
         st.info('I could not yet verify a commercial conclusion. The evidence and remaining checks are available below.')
-        for issue in item.get('issues',[])[:2]:safe_text(issue)
     else:
         a=item['answer'];d=item['display']
         safe_text(d['direct_answer'])
@@ -27,7 +26,11 @@ def render_commercial(item,build_chart,safe_text):
             safe_text(d['next_step'])
         if a['limitations']:safe_text(a['limitations'])
         for index in a['table_results']:
-            st.dataframe(pd.DataFrame(item['results'][index]['rows']),hide_index=True,use_container_width=True)
+            frame=pd.DataFrame(item['results'][index]['rows'])
+            internal={'evidence_level','snapshot_id','productivity_basis','period_end_exclusive'}
+            frame=frame.drop(columns=[c for c in frame if c in internal]).round(2)
+            frame.columns=[c.replace('_',' ').replace('aud','AUD').replace('pct','%').capitalize().replace('Aud','AUD') for c in frame]
+            st.dataframe(frame,hide_index=True,use_container_width=True)
         if a['visual']['kind']!='none':
             chart=a['visual']
             st.altair_chart(build_chart(pd.DataFrame(item['results'][chart['result']]['rows']),chart),use_container_width=True)

@@ -88,6 +88,18 @@ def test_numeric_prose_accepts_rounding_but_rejects_uncomputed_amounts():
     with pytest.raises(QueryBlocked,match='placeholder'):render_statement(statement,results,scope())
 
 
+def test_reference_completion_only_links_existing_calculated_values():
+    from commercial.evidence import complete_references,render_statement
+    statement=Statement(text='The totals were 120 and 100, a difference of 20.',evidence=[dict(result=0,row=0,column='first'),dict(result=0,row=0,column='second')],level='observed')
+    results=[dict(rows=[dict(first=120,second=100)]),dict(rows=[dict(difference=20)])]
+    complete_references(statement,results)
+    assert any(r.result==1 and r.column=='difference' for r in statement.evidence)
+    assert render_statement(statement,results,scope())==statement.text
+    statement.text='The totals differed by 30.'
+    complete_references(statement,results)
+    with pytest.raises(QueryBlocked):render_statement(statement,results,scope())
+
+
 def test_revenue_tools_resolve_the_same_staff_ids_as_performance():
     from commercial.evidence import execute
     db=Database.from_intake(load_snapshot(),rules_override='')

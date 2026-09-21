@@ -21,8 +21,8 @@ class Reference(BaseModel):
 
 
 class Statement(BaseModel):
-    text: str = Field(description='Concise plain-English sentence using digits for quantities. Numeric facts must exactly match or faithfully round cited evidence. Optional [[0]] inserts the first evidence cell; never embed reference objects in text. Evidence supports the WHOLE meaning.')
-    evidence: list[Reference] = Field(default_factory=list,max_length=12)
+    text: str = Field(max_length=360,description='Short plain-English statement, at most two numerical facts. Numeric facts must exactly match or faithfully round cited evidence. Optional [[0]] inserts the first evidence cell; never embed reference objects in text. Evidence supports the WHOLE meaning.')
+    evidence: list[Reference] = Field(default_factory=list,max_length=32)
     context_ids: list[str] = Field(default_factory=list,max_length=6)
     level: Literal['observed','supported_interpretation','unverified_possibility']
 

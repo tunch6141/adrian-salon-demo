@@ -41,7 +41,7 @@ def context_for(store,scope):
 
 def investigate(client,model,db,question,history,context_store,on_stage=None,active_state=None):
     stage=on_stage or (lambda _:None)
-    started=time.monotonic();stats=[];results=[];trace=[];errors=[];seen=set();contexts=[]
+    started=time.monotonic();stats=[];results=[];trace=[];errors=[];seen=set();contexts=[];audit_reviews=[]
     # New runtime never reads legacy history plans, rules, or reasoning graph.
     state=active_state or next((h['analytical_state'] for h in reversed(history) if h.get('analytical_state')),None)
     if state and state.get('snapshot_id')!=db.intake.revision:
@@ -68,7 +68,7 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
                     'Use short sentences with at most two numerical facts each and cite the exact cells for BOTH facts. '
                     'Do not invent missing calculations; narrow the conclusion and recommend investigation where necessary. '
                     'Correct every listed validation problem. An unproven owner premise must be challenged, not assumed.',payload,stats)
-                step=step.model_copy(update={'calls':[],'hypotheses':finished.hypotheses,'final':finished.final})
+                step=step.model_copy(update={'calls':[],'hypotheses':finished.hypotheses or step.hypotheses,'final':finished.final})
             else:step=model_call(client,model,Step,CONTRACT+'\n'+DATA_DEFINITIONS,payload,stats)
         except Exception as exc:
             from pydantic import ValidationError
@@ -129,6 +129,7 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
         audit=model_call(client,model,Audit,AUDIT+'\n'+DATA_DEFINITIONS,
             dict(question=question,active_state=state,scope=scope.model_dump(),hypotheses=[h.model_dump() for h in step.hypotheses],
                  answer=step.final.model_dump(),rendered_statements=list(rendered.values()),results=results,contexts=contexts,trace=trace),stats)
+        audit_reviews.append(audit.model_dump())
         if not audit.approved:
             errors=audit.problems
             payload['rejected_answer']=step.final.model_dump()
@@ -144,7 +145,7 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
         answer=answer.model_dump() if answer else None,results=results,contexts=contexts,issues=errors,
         execution_trace=trace,analytical_state=saved_state,
         hypothesis_tests=[h.model_dump() for h in step.hypotheses] if step else [],
-        candidate_answer=step.final.model_dump() if step and step.final else None,
+        candidate_answer=step.final.model_dump() if step and step.final else None,audit_reviews=audit_reviews,
         reporting_date=db.intake.asof.date().isoformat(),
         timing=dict(total_seconds=round(time.monotonic()-started,2),calls=stats))
     if answer:
