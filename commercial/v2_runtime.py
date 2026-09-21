@@ -6,9 +6,9 @@ from datetime import date,timedelta
 from pydantic import ValidationError
 from openai import pydantic_function_tool
 from analyst_engine import QueryBlocked, validate_claim_numbers, validate_chart
-from analytics.diagnostics import calendar_periods, booking_lookup
+from analytics.diagnostics import calendar_periods, booking_lookup, comparable_periods
 from .v2_models import (AnalysisScope, FrameQuestion, QueryData, ReadRecords,
-                        StaffPerformance, ReadSQL, FinishAnswer, Review, BookingRecord)
+                        StaffPerformance, ReadSQL, FinishAnswer, Review, BookingRecord, QueryCurrentData, ComparePeriods)
 from .v2_data import catalog, resolve_entities, query_data, read_records, staff_performance, read_sql
 from .v2_prompts import SYSTEM, REVIEW
 
@@ -17,7 +17,8 @@ MAX_ROUNDS=8
 MAX_DATA_CALLS=10
 TOOLS={
  'frame_question':(FrameQuestion,'Establish or correct the commercial objective, scope, hypotheses or essential clarification before retrieving data.'),
- 'query_data':(QueryData,'Aggregate any available cleaned dataset with active scope applied automatically. Supports matched-period changes, time grouping and ratios from the same rows. Returns full scoped totals and coverage.'),
+ 'query_data':(QueryCurrentData,'Retrieve totals or a time trend within ONE current/baseline period. Active scope is applied automatically. Ratios use the same source rows. For current-versus-baseline changes use compare_periods.'),
+ 'compare_periods':(ComparePeriods,'Calculate current versus baseline totals, differences and percentage changes for the matched periods declared in frame_question. Optional dimensions compare each group. No time buckets.'),
  'read_records':(ReadRecords,'Read selected individual cleaned records with active scope. Use exact filters for bookings, customers or other record IDs.'),
  'booking_record':(BookingRecord,'Retrieve an individual cleaned booking by its identifier, including a uniquely resolvable zero-padding variant. An exact record request is independent of the current reporting period.'),
  'staff_performance':(StaffPerformance,'Retrieve trusted staff revenue, completed service hours, capacity, utilisation and service mix for the active people and dates, with optional matched-period comparison.'),
@@ -42,6 +43,8 @@ def resolve_scope(patch,previous,relation,calendar):
     if data['start_date']>data['end_date']:raise QueryBlocked('The period is reversed.')
     if bool(data['comparison_start'])!=bool(data['comparison_end']) or data['comparison_start']>data['comparison_end']:
         raise QueryBlocked('Provide a complete, ordered comparison period.')
+    if data['comparison_start'] and not comparable_periods(data['start_date'],data['end_date'],data['comparison_start'],data['comparison_end'],1):
+        raise QueryBlocked('Declare matched current and baseline periods separately. Calendar options: '+json.dumps(calendar))
     return AnalysisScope(**data)
 
 
@@ -173,8 +176,8 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
                     review=review_response.output_parsed
                     if review is None:raise QueryBlocked('The evidence review did not complete.')
                     reviews.append(review.model_dump())
-                    if review.blocking_errors:
-                        errors=review.blocking_errors
+                    if review.blocking_errors or review.unsupported_statements:
+                        errors=review.blocking_errors+review.unsupported_statements
                         output=dict(accepted=False,blocking_errors=errors,evidence_needed=review.evidence_needed,
                                     remaining_data_calls=MAX_DATA_CALLS-count,remaining_rounds=MAX_ROUNDS-round_index-1)
                     else:
@@ -183,12 +186,17 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
                 else:
                     if frame is None:raise QueryBlocked('Frame the question before retrieving data.')
                     if count>=MAX_DATA_CALLS:raise QueryBlocked('Data-call budget reached. Give the supported answer with remaining uncertainty.')
-                    signature=call.name+request.model_dump_json(exclude={'purpose'})
+                    signature=call.name+scope.model_dump_json()+request.model_dump_json(exclude={'purpose'})
                     if signature in seen:raise QueryBlocked('This exact request was already made; use its results or change the investigation.')
-                    seen.add(signature);count+=1
-                    new=booking_lookup(db,request.identifier) if call.name=='booking_record' else {'query_data':query_data,'read_records':read_records,'staff_performance':staff_performance,'read_sql':read_sql}[call.name](db,request,scope)
+                    if call.name=='compare_periods':new=query_data(db,QueryData(**request.model_dump(),period='compare'),scope)
+                    elif call.name=='booking_record':new=booking_lookup(db,request.identifier)
+                    else:new={'query_data':query_data,'read_records':read_records,'staff_performance':staff_performance,'read_sql':read_sql}[call.name](db,request,scope)
+                    seen.add(signature)
+                    count+=1
                     for p in new:p['evidence_id']='E'+str(len(results)+1);results.append(p)
-                    output=dict(evidence=new,remaining_data_calls=MAX_DATA_CALLS-count,remaining_rounds=MAX_ROUNDS-round_index-1)
+                    # Only one citation identifier reaches the model. Internal packet
+                    # hashes and table names are not competing citation conventions.
+                    output=dict(evidence=[{k:p[k] for k in ['evidence_id','rows','metadata'] if k in p} for p in new],remaining_data_calls=MAX_DATA_CALLS-count,remaining_rounds=MAX_ROUNDS-round_index-1)
                     trace.append(dict(tool=call.name,request=request.model_dump(),sources=[p['evidence_id'] for p in new],status='ok'))
             except (QueryBlocked,ValidationError,ValueError,KeyError,TypeError) as exc:
                 errors=[str(exc)];output=dict(error=str(exc),remaining_data_calls=MAX_DATA_CALLS-count)

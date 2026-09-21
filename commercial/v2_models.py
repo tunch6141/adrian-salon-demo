@@ -7,11 +7,11 @@ from .models import ContextDraft
 class AnalysisScope(BaseModel):
     objective: str | None = None
     subject: str | None = None
-    entities: list[str] | None = None
-    start_date: str | None = None
-    end_date: str | None = None
-    comparison_start: str | None = None
-    comparison_end: str | None = None
+    entities: list[str] | None = Field(default=None,description='Only identities explicitly selected by the owner. Empty list means entire business, including unattributed rows. Null inherits previous scope.')
+    start_date: str | None = Field(default=None,description='Start of the CURRENT requested period only, inclusive ISO date. Null inherits. Empty for undated snapshot.')
+    end_date: str | None = Field(default=None,description='End of CURRENT requested period only. Actual results cannot extend beyond reporting date.')
+    comparison_start: str | None = Field(default=None,description='Start of an optional separate baseline of equal duration or full calendar month. Empty means no comparison.')
+    comparison_end: str | None = Field(default=None,description='End of the optional baseline. For current partial month use previous_month_matched_elapsed from calendar, not full previous month.')
     category: Literal['all','service','product','part'] | None = None
     measures: list[str] | None = None
     display: Literal['text','table','line','bar','pie'] | None = None
@@ -45,17 +45,29 @@ class DataFilter(BaseModel):
     values: list[str] = Field(max_length=100)
 
 
-class QueryData(BaseModel):
+class QueryMeasures(BaseModel):
     dataset: str
     purpose: str = Field(description='What question or competing explanation this evidence tests')
     dimensions: list[str] = Field(max_length=4)
     measures: list[Measure] = Field(max_length=8)
     ratios: list[Ratio] = Field(default_factory=list,max_length=3)
     filters: list[DataFilter] = Field(default_factory=list,max_length=8)
-    period: Literal['current','comparison','compare','snapshot'] = 'current'
-    time_grain: Literal['none','day','week','month'] = 'none'
     whole_business_context: bool = Field(default=False,description='Only true for contextual evidence that cannot be attributed to the selected people. Never treat this as their performance.')
     limit: int = Field(default=100,ge=1,le=100)
+
+
+class QueryData(QueryMeasures):
+    period: Literal['current','comparison','compare','snapshot'] = 'current'
+    time_grain: Literal['none','day','week','month'] = 'none'
+
+
+class QueryCurrentData(QueryMeasures):
+    period: Literal['current','comparison','snapshot'] = Field(default='current',description='One active period or a current snapshot. For changes between periods use compare_periods instead.')
+    time_grain: Literal['none','day','week','month'] = Field(default='none',description='none returns totals by dimensions; day/week/month returns a time trend within the selected period.')
+
+
+class ComparePeriods(QueryMeasures):
+    pass
 
 
 class ReadRecords(BaseModel):
@@ -101,5 +113,7 @@ class FinishAnswer(BaseModel):
 
 
 class Review(BaseModel):
+    evidence_inventory: list[str] = Field(default_factory=list,max_length=6,description='First inventory what the retrieved evidence actually measures. Do not copy claims from the proposed answer.')
+    unsupported_statements: list[str] = Field(default_factory=list,max_length=6,description='Copy any factual or causal statement for which the retrieved evidence is absent or contradictory, including qualitative high/low/profit/demand claims without measurements or comparators.')
     blocking_errors: list[str] = Field(max_length=4,description='Only demonstrably false or unsupported claims in the answer. Missing proof of a cause is NOT an error if the answer explicitly says it is unknown.')
     evidence_needed: list[str] = Field(max_length=3,description='Specific available evidence worth retrieving to correct errors; avoid requests for data already present.')

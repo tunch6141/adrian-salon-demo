@@ -269,7 +269,7 @@ def validate_claim_numbers(results,claim,context_ids,periods,allow_magnitude=Fal
         decimals=len(token.split('.')[1]) if '.' in token else 0
         tolerance=0.5*(10**(-decimals))+1e-8
         if not any(abs(v-n)<tolerance for v in values):
-            raise QueryBlocked('A number in the answer is not present in its cited results. Retrieve a calculated total or difference.')
+            raise QueryBlocked(f'A number in the answer ({token}) is not present in its cited results. Retrieve a calculated total or difference.')
 
 
 def bind_claim_values(results,claim,periods,contexts=()):

@@ -36,8 +36,16 @@ DEFINITIONS={
 
 
 def catalog(db):
-    return {name:dict(columns=cols,date_column=DEFINITIONS.get(name,('', 'cleaned canonical records'))[0],
-                     definition=DEFINITIONS.get(name,('', 'cleaned canonical records'))[1]) for name,cols in db.schema.items() if name!='service_sales'}
+    result={}
+    for name,cols in db.schema.items():
+        if name=='service_sales':continue
+        frame=db.frames[name];dc,definition=DEFINITIONS.get(name,('', 'cleaned canonical records'))
+        values={c:frame[c].dropna().unique().tolist()[:8] for c in cols if c in ['item_type','transaction_type','customer_type','status','horizon','cost_provenance']}
+        result[name]=dict(columns=cols,date_column=dc,definition=definition,categorical_values=values)
+        if dc in frame:
+            dates=frame[dc].dropna().astype(str)
+            if len(dates):result[name]['available_dates']=[dates.min()[:10],dates.max()[:10]]
+    return result
 
 
 def _column(frame,column):

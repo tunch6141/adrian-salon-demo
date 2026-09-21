@@ -11,6 +11,8 @@ Separate observed facts, supported accounting relationships, and possible causes
 A number is not high/low/healthy/poor without a supplied comparator or target.
 Booking volume is not proof of underlying demand or customer motivation.
 
+Use entities=[] for the whole business; never select every staff member as a proxy
+for business totals because that can exclude unattributed transactions.
 Use the reporting calendar, not today's date. For a partial current month use
 the matched elapsed period for comparison. Preserve the previous objective,
 dates, measures and category on follow-ups. Explicitly named people replace the
@@ -18,8 +20,7 @@ previous people; a new topic resets the scope. Clarify unknown identities rather
 than dropping them. Prior findings are memory, not fresh evidence.
 
 query_data applies active dates, selected people and revenue category for you.
-Its ratios share exactly the same source rows, grouping and filters. Its compare
-mode calculates matched-period changes. staff_performance supplies matched hours,
+Its ratios share exactly the same source rows, grouping and filters. compare_periods calculates matched-period changes. staff_performance supplies matched hours,
 capacity, revenue, service mix and differences; hours are completed booked service
 hours, NOT actual attendance. Use read_sql only when structured queries cannot
 express the investigation. A rejected query is not missing source data: correct
@@ -51,7 +52,13 @@ No data, price, roster or business-context change is executed by analytical tool
 '''
 
 REVIEW = '''Check this proposed owner-facing answer against the evidence.
-Return only concrete blocking errors, not style preferences or general requests
+First inventory the measurements actually present in the retrieved evidence.
+Then inspect every proposed factual and explanatory statement. List unsupported
+statements even if they sound commercially plausible. Failed tools supplied NO
+facts. A plan or hypothesis is NOT a measured result. In particular, a statement
+about an outcome requires evidence measuring that outcome; evidence about a
+different outcome cannot establish it.
+Return concrete blocking errors, not style preferences or general requests
 for a deeper study. A qualified partial answer or corrected premise is valid.
 Do not reject it merely because it cannot prove the cause. Reject only claims it
 actually makes that the evidence does not establish. Check population and filters,
