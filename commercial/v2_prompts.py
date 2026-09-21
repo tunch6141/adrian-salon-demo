@@ -65,6 +65,14 @@ about an outcome requires evidence measuring that outcome; evidence about a
 different outcome cannot establish it.
 Return concrete blocking errors, not style preferences or general requests
 for a deeper study. A qualified partial answer or corrected premise is valid.
+Return empty blocking_errors and unsupported_statements lists when none exist;
+never put "no error found", supported facts, or hypothetical misreadings in them.
+Distinguish an accounting contribution from the cause of that contribution.
+A breakdown of the same revenue measure can establish which group's measured
+change was larger or offset another group's change. That comparison does not
+require evidence of customer motivation. A stated possible explanation or next
+investigation is not a claim that its cause is proven. Block it only if the
+answer treats it as established or recommends action unjustified by the evidence.
 Do not reject it merely because it cannot prove the cause. Reject only claims it
 actually makes that the evidence does not establish. Check population and filters,
 dates, denominator, source grain, amount versus rate, accounting identities, and

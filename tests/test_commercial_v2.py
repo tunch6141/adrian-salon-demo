@@ -102,6 +102,17 @@ def test_reported_context_numbers_are_quotes_not_calculated_facts():
     with pytest.raises(QueryBlocked):
         validate_report(final(answer='The owner reported 3 days of leave.',context_used=['NOTE']),[result],scope(),[note])
 
+
+def test_missing_citation_is_repaired_but_unretrieved_number_is_rejected():
+    from commercial.v2_runtime import validate_report
+    packets=[dict(evidence_id='E1',rows=[dict(revenue=100)]),
+             dict(evidence_id='E2',rows=[dict(revenue=990)])]
+    report=final(answer='Product revenue was AUD 990.',sources=['E1'])
+    assert validate_report(report,packets,scope(),[])==[0,1]
+    assert report.sources==['E1','E2']
+    with pytest.raises(QueryBlocked):
+        validate_report(final(answer='Product revenue was AUD 999999.',sources=['E1']),packets,scope(),[])
+
 def test_empty_evidence_and_renamed_duplicate_counts_cannot_support_a_claim(db):
     from commercial.v2_runtime import validate_report
     with pytest.raises(QueryBlocked,match='No retrieved record'):

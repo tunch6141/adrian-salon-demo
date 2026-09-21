@@ -117,8 +117,18 @@ def validate_report(report,results,scope,contexts):
         i=len(check_results);check_results.append(dict(rows=[row]))
         refs.extend(dict(result=i,row=0,column=k) for k in row)
     text='\n'.join([report.answer,*report.evidence,report.explanation,report.limitations])
-    validate_claim_numbers(check_results,dict(text=text,evidence=refs),report.context_used,
-        [scope.start_date,scope.end_date,scope.comparison_start,scope.comparison_end],allow_magnitude=True)
+    periods=[scope.start_date,scope.end_date,scope.comparison_start,scope.comparison_end]
+    try:
+        validate_claim_numbers(check_results,dict(text=text,evidence=refs),report.context_used,periods,allow_magnitude=True)
+    except QueryBlocked:
+        # All packets came from successful tools in this investigation. Repair a
+        # missing packet citation locally, rather than making the model rerun a
+        # calculation that already exists. Unsupported numbers still fail; the
+        # semantic review must still check population, period and attribution.
+        expanded=[dict(result=i,row=j,column=k) for i,p in enumerate(check_results)
+                  for j,row in enumerate(p['rows']) for k in row]
+        validate_claim_numbers(check_results,dict(text=text,evidence=expanded),report.context_used,periods,allow_magnitude=True)
+        report.sources=list(byid)
     return [byid[key] for key in report.sources]
 
 
