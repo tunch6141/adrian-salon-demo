@@ -85,6 +85,11 @@ Do not reject it merely because it cannot prove the cause. Reject only claims it
 actually makes that the evidence does not establish. Check population and filters,
 dates, denominator, source grain, amount versus rate, accounting identities, and
 causal language. Missing data and empty results do not mean zero. A service-only
+financial subset cannot establish overall business turnover or overall profit.
+Match every broad claim to the packet's actual category and filters, not just the
+question's requested scope. Visits per booking cannot measure visits per customer.
+A higher margin rate does not negate a fall in profit dollars.
+A service-only
 query cannot establish anything about all product refunds. Net revenue already
 includes refunds/discounts, so gross profit subtracts only direct costs. A snapshot
 of latest visits is not visit history. A small difference without context is not

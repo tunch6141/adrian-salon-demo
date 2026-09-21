@@ -126,6 +126,17 @@ def test_grouped_comparison_preserves_independent_full_scope_totals(db):
     assert totals['revenue_change']==pytest.approx(-310)
     validate_report(final(answer='Whole-business revenue fell AUD 310 to AUD 20,345.'),[packet],period,[])
 
+
+def test_dated_queries_cannot_bypass_scope_and_horizons_cannot_overlap(db):
+    with pytest.raises(QueryBlocked,match='dated history'):
+        query_data(db,query(period='snapshot'),scope())
+    next_week=scope(entities=[],category='all',start_date='2026-09-21',end_date='2026-09-27')
+    result=query_data(db,query(dataset='future_workload',measures=[Measure(column='booked_hours',operation='sum',name='booked'),Measure(column='available_bookable_hours',operation='sum',name='available')]),next_week)[0]
+    assert result['rows']==[dict(booked=43.,available=114.)]
+    assert result['metadata']['source_rows']==3
+    with pytest.raises(QueryBlocked,match='Identical aggregations'):
+        query_data(db,query(dataset='customer_visits',measures=[Measure(column='booking_id',operation='count',name='visits'),Measure(column='booking_id',operation='count_distinct',name='customers')]),scope(entities=[],category='all'))
+
 def test_empty_evidence_and_renamed_duplicate_counts_cannot_support_a_claim(db):
     from commercial.v2_runtime import validate_report
     with pytest.raises(QueryBlocked,match='No retrieved record'):

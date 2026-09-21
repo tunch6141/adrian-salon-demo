@@ -1,7 +1,7 @@
 """Scoped read-only tools with declared grains. No question-specific routing."""
 import json
 import re
-from datetime import date
+from datetime import date,timedelta
 import pandas as pd
 import sqlglot
 from sqlglot import exp
@@ -26,7 +26,7 @@ DEFINITIONS={
  'staff_return_outcomes':('service_date','one service episode with eligibility and return observation; immature episodes cannot prove churn'),
  'customer_returns':('', 'current customer snapshot of last visit and expected due date; NOT historical visit frequency or cohort retention'),
  'customer_records':('', 'one customer master record; first_completed_visit_date can predate exported booking history'),
- 'future_workload':('', 'future scheduled hours and equal-lead-time historical bookings; not earned revenue or proof of demand; period_start identifies horizon'),
+ 'future_workload':('', 'one staff per precomputed horizon; horizons overlap and MUST NOT be added together; future scheduled hours, not earned revenue or proof of demand'),
  'inventory_coverage':('', 'current stock and movement; configured coverage estimate; unknown/suppressed values remain qualified'),
  'landed_receipts':('received_at','one receipt item with allocated charges; compare same item, unit and currency'),
  'sale_cost_allocations':('posted_at','cost provenance already represented in financial direct_cost; not an additional expense'),
@@ -37,6 +37,9 @@ DEFINITIONS={
  'supplier_credits':('credited_on','one supplier credit'),
  'price_history':('effective_on','one recorded price change; not proof of its commercial effect'),
 }
+
+ROW_KEYS={'customer_visits':'booking_id','booking_records':'booking_id',
+          'booking_outcomes':'booking_id','completed_services':'booking_service_id'}
 
 
 def catalog(db):
@@ -110,6 +113,16 @@ def scoped_frame(db,dataset,scope,filters=(),period='current',whole_business_con
     if dc and dc in frame:
         frame[dc]=frame[dc].map(lambda v:str(local_date(str(v),db.intake.zone)) if pd.notna(v) else None)
     start,end=(scope.comparison_start,scope.comparison_end) if period=='comparison' else (scope.start_date,scope.end_date)
+    if dc and period=='snapshot':
+        raise QueryBlocked('This dataset is dated history, not a snapshot. Use current or comparison; active dates must not be bypassed.')
+    horizon_scope=False
+    if {'period_start','period_end_exclusive'}<=set(frame.columns):
+        if not start or not end:raise ScopeRepairNeeded('Select dates for the precomputed horizon before retrieving it.')
+        exclusive=str(date.fromisoformat(end)+timedelta(days=1))
+        frame=frame[frame.period_start.astype(str).eq(start)&frame.period_end_exclusive.astype(str).eq(exclusive)]
+        if frame.empty:raise QueryBlocked('No precomputed horizon exactly matches these dates. Use dated booking and capacity records for this period; overlapping horizons cannot be added together.')
+        applied.extend([dict(column='period_start',values=[start]),dict(column='period_end_exclusive',values=[exclusive])])
+        horizon_scope=True
     if period!='snapshot' and dc and start and end:
         days=frame[dc].astype('string').str[:10]
         frame=frame[days.ge(start)&days.le(end)];applied.append(dict(column=dc,start=start,end=end))
@@ -125,9 +138,13 @@ def scoped_frame(db,dataset,scope,filters=(),period='current',whole_business_con
         frame=_filter(frame,f);applied.append(f.model_dump())
     meta=dict(dataset=dataset,definition=DEFINITIONS.get(dataset,('', 'cleaned canonical records'))[1],
               filters=applied,source_rows=len(frame),available_rows=original,
-              period=[start,end] if dc and period!='snapshot' else 'snapshot',
+              period=[start,end] if dc or horizon_scope else 'snapshot',
               attribution='whole business context' if whole_business_context else 'selected scope',
               category=category,entities=[e['name'] for e in entities] if not whole_business_context else [])
+    category_filters=[f for f in filters if f.column=='item_type']
+    if category_filters:
+        meta['requested_category']=category
+        meta['category']='filtered subset: '+json.dumps([f.model_dump() for f in category_filters])
     return frame,meta
 
 
@@ -141,7 +158,7 @@ def _aggregate(frame,request,date_column):
         frame=frame.assign(period_start=dates.dt.strftime('%Y-%m-01' if request.time_grain=='month' else '%Y-%m-%d'))
         dimensions=['period_start']+dimensions
     names=[m.name for m in request.measures]+[r.name for r in request.ratios]
-    signatures=[(m.column,m.operation) for m in request.measures]
+    signatures=[(m.column,'row_count' if m.column==ROW_KEYS.get(request.dataset) and m.operation in ['count','count_distinct'] else m.operation) for m in request.measures]
     if len(signatures)!=len(set(signatures)):
         raise QueryBlocked('Identical aggregations cannot measure different outcomes under different names. Group by the distinguishing category/status or use separately filtered queries.')
     if len(names)!=len(set(names)) or set(names)&set(dimensions):raise QueryBlocked('Output names must be unique and separate from dimensions.')
@@ -172,6 +189,9 @@ def _aggregate(frame,request,date_column):
 
 
 def query_data(db,request,scope):
+    if DEFINITIONS.get(request.dataset,('', ''))[0] and request.period!='compare':
+        start,end=(scope.comparison_start,scope.comparison_end) if request.period=='comparison' else (scope.start_date,scope.end_date)
+        if not start or not end:raise ScopeRepairNeeded('Select an explicit period for dated aggregation. Use available date bounds if the owner requested all history.')
     if request.period=='compare':
         if not DEFINITIONS.get(request.dataset,('', ''))[0]:raise QueryBlocked('A snapshot cannot establish historical period changes. Select a dated dataset.')
         if request.time_grain!='none':raise QueryBlocked('For matched period totals use time_grain=none; use a separate trend query for time buckets.')
