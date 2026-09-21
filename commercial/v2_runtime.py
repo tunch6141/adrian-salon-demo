@@ -26,9 +26,19 @@ TOOLS={
  'finish_answer':(FinishAnswer,'Submit a concise evidence-grounded commercial answer. Checks can return feedback; correct or investigate further while budget remains. Charts are optional and cannot block a supported answer.')}
 
 
-def tool_schema(name):
+def tool_schema(name,results=(),contexts=()):
     model,description=TOOLS[name]
     function=pydantic_function_tool(model,name=name,description=description)['function']
+    if name=='finish_answer':
+        params=function['parameters'];props=params['properties']
+        evidence_ids=[r['evidence_id'] for r in results]
+        if evidence_ids:props['sources']['items']['enum']=evidence_ids
+        else:props['sources']['maxItems']=0
+        props['table_source']['enum']=['',*evidence_ids]
+        params['$defs']['ChartRequest']['properties']['source']['enum']=['',*evidence_ids]
+        context_ids=[r['id'] for r in contexts]
+        if context_ids:props['context_used']['items']['enum']=context_ids
+        else:props['context_used']['maxItems']=0
     return {'type':'function',**function}
 
 
@@ -43,23 +53,24 @@ def resolve_scope(patch,previous,relation,calendar):
     if data['start_date']>data['end_date']:raise QueryBlocked('The period is reversed.')
     if bool(data['comparison_start'])!=bool(data['comparison_end']) or data['comparison_start']>data['comparison_end']:
         raise QueryBlocked('Provide a complete, ordered comparison period.')
-    if data['comparison_start'] and not comparable_periods(data['start_date'],data['end_date'],data['comparison_start'],data['comparison_end'],1):
-        raise QueryBlocked('Declare matched current and baseline periods separately. Calendar options: '+json.dumps(calendar))
     return AnalysisScope(**data)
 
 
 def report_calendar(intake):
     result=calendar_periods(intake);today=intake.asof.date();last=today.replace(day=1)-timedelta(days=1)
+    result.pop('weekly_baseline',None);result.pop('monthly_baseline',None)
     monday=today-timedelta(days=today.weekday())
     result.update(current_month_elapsed=[str(today.replace(day=1)),str(today)],
                   previous_month_matched_elapsed=[str(last.replace(day=1)),str(last.replace(day=min(today.day,last.day)))],
+                  preceding_complete_week=[str(monday-timedelta(days=14)),str(monday-timedelta(days=8))],
+                  preceding_complete_month=[str((last.replace(day=1)-timedelta(days=1)).replace(day=1)),str(last.replace(day=1)-timedelta(days=1))],
                   next_week=[str(monday+timedelta(days=7)),str(monday+timedelta(days=13))])
     return result
 
 
 def context_candidates(store,db,scope):
     identities=resolve_entities(db,scope.entities)
-    names=[p['name'] for p in identities] or ['Salon']
+    names=[p['name'] for p in identities] or [r['staff_name'] for r in db.intake.tables.get('staff',[])]+['Salon']
     names.extend('Customer '+p['value'] for p in identities if p['key']=='customer_id')
     notes=[]
     for name in names:notes.extend(store.search(name,scope.start_date,scope.end_date))
@@ -141,7 +152,7 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
         names=['frame_question'] if frame is None else list(TOOLS)
         if round_index==MAX_ROUNDS-1:names=['finish_answer']
         request_started=time.monotonic()
-        response=client.responses.create(model=model,instructions=SYSTEM,input=messages,tools=[tool_schema(n) for n in names],
+        response=client.responses.create(model=model,instructions=SYSTEM,input=messages,tools=[tool_schema(n,results,contexts) for n in names],
             tool_choice='required',parallel_tool_calls=len(names)>1,max_output_tokens=2400,temperature=0.1,store=False)
         _timing(stats,'investigation',response,request_started)
         messages.extend([item.model_dump(exclude_none=True) for item in response.output])

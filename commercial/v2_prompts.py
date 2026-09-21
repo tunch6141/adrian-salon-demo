@@ -15,6 +15,8 @@ Use entities=[] for the whole business; never select every staff member as a pro
 for business totals because that can exclude unattributed transactions.
 Use the reporting calendar, not today's date. For a partial current month use
 the matched elapsed period for comparison. Preserve the previous objective,
+If the owner does not specify dates, use a recent comparable window supported by
+the data and state it in the answer. Do not invent arbitrary distant baselines.
 dates, measures and category on follow-ups. Explicitly named people replace the
 previous people; a new topic resets the scope. Clarify unknown identities rather
 than dropping them. Prior findings are memory, not fresh evidence.

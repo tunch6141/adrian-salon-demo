@@ -100,7 +100,7 @@ class ChartRequest(BaseModel):
 
 class FinishAnswer(BaseModel):
     answer: str = Field(description='Direct commercial answer, at most 3 short sentences. Challenge a false or unproven premise.')
-    evidence: list[str] = Field(max_length=3,description='Only the numerical facts needed to support the answer; digits, AUD excluding GST.')
+    evidence: list[str] = Field(max_length=3,description='Natural-language key factual sentences, NOT source IDs. Only facts needed to support the answer; digits, AUD excluding GST.')
     sources: list[str] = Field(max_length=12,description='Evidence IDs supporting factual statements, e.g. E1. No row/cell addresses.')
     explanation: str = Field(description='Explain the supported commercial mechanism or remaining uncertainty; never repeat a metric list.')
     next_step: str = Field(description='One supported action, or the next investigation if cause remains uncertain. Empty for a complete lookup.')
