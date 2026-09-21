@@ -6,7 +6,7 @@ from streamlit.testing.v1 import AppTest
 ROOT=Path(__file__).resolve().parents[1]
 
 def test_app_uses_corrected_data_in_analytical_chat():
-    app=AppTest.from_file(str(ROOT/'app.py'),default_timeout=60)
+    app=AppTest.from_file(str(ROOT/'pages/3_Stage_1_Preview.py'),default_timeout=60)
     app.secrets.update(DEMO_PASSWORD='test',OPENAI_API_KEY='fake-key',OPENAI_MODEL='mock-model')
     app.run();app.text_input(key='v4_password').set_value('test').run()
     from commercial.models import Scope, Step, ToolCall, Diagnosis, Statement, Visual, Audit, Conclusion, EvidenceAssessment

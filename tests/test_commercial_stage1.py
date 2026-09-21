@@ -84,6 +84,26 @@ def test_no_current_citations_means_no_invented_answer():
     with pytest.raises(QueryBlocked):validate_answer(answer(),[],[],scope(),[],'lookup')
 
 
+def test_unestablished_driver_cannot_be_promoted_by_an_approving_writer_or_auditor():
+    db=Database.from_intake(load_snapshot(),rules_override='')
+    request=Step(intent='lookup',topic_relation='new',scope=scope(),hypotheses=[],calls=[ToolCall(kind='sql',purpose='Read requested evidence',sql='SELECT SUM(net_revenue) AS revenue FROM financial_lines')],final=None,draft=None,clarification='',unresolved=[])
+    unsafe=answer(primary_driver=Statement(text='Costs caused the decline.',sources=[0],level='supported_interpretation'))
+    proposed=request.model_copy(deep=True);proposed.calls=[];proposed.final=unsafe
+    def respond(client,model,schema,instructions,payload,stats):
+        if schema is EvidenceAssessment:
+            assert 'answer' not in payload and 'hypotheses' not in payload
+            return assessment()
+        if schema is Audit:return Audit(approved=True,problems=[])
+        if schema is Conclusion:return Conclusion(hypotheses=[],final=unsafe)
+        return proposed if payload['results'] else request
+    try:
+        with patch('commercial.runtime.model_call',side_effect=respond):
+            result=investigate(None,'gpt-4.1-mini',db,'Explain the outcome',[],ContextStore())
+        assert result['status']=='facts_only' and result['answer'] is None
+        assert any('no primary driver' in issue for issue in result['issues'])
+    finally:db.close()
+
+
 def test_numeric_prose_accepts_rounding_but_rejects_uncomputed_amounts():
     from commercial.evidence import render_statement
     statement=Statement(text='Revenue is AUD 123.46.',evidence=[dict(result=0,row=0,column='revenue')],level='observed')
