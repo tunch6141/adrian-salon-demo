@@ -2,7 +2,8 @@
 import ast
 import math
 import operator
-from analyst_engine import QueryBlocked, reference_value, bind_claim_values, validate_chart
+import re
+from analyst_engine import QueryBlocked, reference_value, validate_claim_numbers, validate_chart
 from analytics.diagnostics import packet, staff_diagnostic, period_diagnostic, revenue_diagnostic, revenue_trend, booking_lookup
 
 
@@ -65,6 +66,26 @@ def statements(answer):
     return [s for s in [answer.direct_answer,*answer.key_evidence,answer.primary_driver,*answer.secondary_drivers,*answer.alternatives,answer.next_step] if s]
 
 
+def render_statement(statement,results,scope):
+    refs=[r.model_dump() for r in statement.evidence]
+    values=[reference_value(results,r) for r in refs]
+    text=statement.text
+    slots={'start':scope.start_date or '', 'end':scope.end_date or ''}
+    for i,(ref,value) in enumerate(zip(refs,values)):
+        if type(value) in (int,float):
+            value=(f'AUD {value:,.2f}' if ref['format']=='money' else
+                   f'{value:,.2f}%' if ref['format']=='percent' else f'{value:,.2f}'.rstrip('0').rstrip('.'))
+        slots[str(i)]=str(value) if value is not None else 'unknown'
+    for slot in re.findall(r'\[\[(.*?)\]\]',text):
+        if slot not in slots:raise QueryBlocked('Invalid value placeholder. Use plain numeric prose with evidence references, or only [[0]], [[1]], [[start]], [[end]]. Never embed reference objects in the sentence.')
+    # Plain numeric prose is accepted only if each value faithfully rounds a cited
+    # cell. Derived amounts must first be calculated. The independent audit checks
+    # that citations support the entire meaning, units, scope and comparison.
+    literal=re.sub(r'\[\[.*?\]\]','',text)
+    validate_claim_numbers(results,dict(text=literal,evidence=refs),statement.context_ids,[scope.start_date,scope.end_date])
+    return re.sub(r'\[\[(.*?)\]\]',lambda m:slots[m.group(1)],text)
+
+
 def validate_answer(answer,results,contexts,scope,hypotheses,intent):
     ids={c['id'] for c in contexts}
     if {c.context_id for c in answer.context_review}!=ids:raise QueryBlocked('Review every retrieved owner context note before finalising.')
@@ -82,8 +103,7 @@ def validate_answer(answer,results,contexts,scope,hypotheses,intent):
     for s in statements(answer):
         if not set(s.context_ids)<=ids:raise QueryBlocked('Unknown context reference.')
         if s.level!='unverified_possibility' and not (s.evidence or s.context_ids):raise QueryBlocked('Observed facts and interpretations need evidence.')
-        claim=dict(text=s.text,evidence=[r.model_dump() for r in s.evidence],context_ids=s.context_ids)
-        rendered[id(s)]=bind_claim_values(results,claim,[scope.start_date,scope.end_date],contexts)
+        rendered[id(s)]=render_statement(s,results,scope)
     for index in answer.table_results:
         if index<0 or index>=len(results):raise QueryBlocked('Selected table does not exist.')
     visual=answer.visual.model_dump()

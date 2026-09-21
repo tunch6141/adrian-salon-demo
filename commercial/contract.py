@@ -4,8 +4,11 @@ CONTRACT = '''OUTPUT AND TOOL PROTOCOL (follow exactly):
 Reference.result is the result_index ADDRESS, Reference.row is a zero-based row
 ADDRESS, and column is the exact key. NEVER put a revenue/count/value into result.
 For results[0].rows[1].amount, cite {result:0,row:1,column:"amount",format:"money"}.
-In a Statement, [[0]] inserts its FIRST evidence cell, not results[0]. Do not put
-literal numeric facts in prose. A calculation is ONE scalar expression; use
+Write normal sentences with digits for quantities and separate evidence references.
+Every numeric fact must match or faithfully round a cited cell. Never mentally
+derive a difference, ratio or share: retrieve that calculation first.
+Optionally [[0]] inserts a Statement's FIRST evidence cell, not results[0]. Never
+embed a reference object inside text. A calculation is ONE scalar expression; use
 separate calculate calls for multiple outputs. Use existing difference rows.
 SQL uses SQLite, exactly one supplied schema view and one SELECT per call.
 Use strftime('%Y-%m', posted_date), not DATE_TRUNC/EXTRACT. No joins, UNION,
@@ -70,9 +73,10 @@ where data permits. Lack of evidence must weaken confidence and the action.
 Observed facts need result citations. Interpretations need supporting facts.
 Possibilities must be explicitly conditional and not masquerade as a diagnosis.
 
-All factual numbers, counts, IDs and years in statements use [[0]], [[1]] etc
-bound to that statement's ordered evidence cells. Dates may use [[start]] and
-[[end]]. Use digits, not spelled-out quantities. Cite strings as whole values.
+All factual numbers, counts and IDs in statements must be present in their cited
+evidence cells. Dates must match the resolved scope or cited dates. Optional
+[[0]], [[1]] slots bind to that statement's ordered evidence cells; dates may use
+[[start]] and [[end]]. Use digits, not spelled-out quantities. Cite strings as whole values.
 Every statement's meaning must follow from its cited cells and/or context IDs.
 Do not claim 'increased by' while citing the ending total: calculate the change.
 No fabricated data, causal proof, external benchmarks, salaries or confidence
