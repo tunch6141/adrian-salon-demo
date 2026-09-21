@@ -176,7 +176,7 @@ def query_data(db,request,scope):
         if not DEFINITIONS.get(request.dataset,('', ''))[0]:raise QueryBlocked('A snapshot cannot establish historical period changes. Select a dated dataset.')
         if request.time_grain!='none':raise QueryBlocked('For matched period totals use time_grain=none; use a separate trend query for time buckets.')
         if not all([scope.start_date,scope.end_date,scope.comparison_start,scope.comparison_end]):raise ScopeRepairNeeded('Declare both comparison periods in frame_question.')
-        if not comparable_periods(scope.start_date,scope.end_date,scope.comparison_start,scope.comparison_end,1):raise ScopeRepairNeeded('Comparison periods must have equal duration or be complete calendar months. Use frame_question with separate named current and baseline windows, not query filters.')
+        if not comparable_periods(scope.start_date,scope.end_date,scope.comparison_start,scope.comparison_end,1):raise ScopeRepairNeeded('The baseline must end before the current period starts. Periods must have equal duration or be complete calendar months. Use frame_question with separate named current and baseline windows, not query filters.')
         if scope.end_date>str(db.intake.asof.date()):raise QueryBlocked('Actuals stop at the reporting clock. Use matched elapsed dates, not a future month end.')
         current=query_data(db,request.model_copy(update={'period':'current'}),scope)[0]
         baseline=query_data(db,request.model_copy(update={'period':'comparison'}),scope)[0]
@@ -192,6 +192,16 @@ def query_data(db,request,scope):
             rows.append(row)
         p=packet(db.intake,request.dataset+'_comparison',rows,json.dumps(scope.model_dump()))
         p['metadata']=dict(current=current['metadata'],baseline=baseline['metadata'],definition='Matched scope and dimensions; current minus baseline. Missing groups remain unknown, not zero.')
+        # These are independently aggregated full-scope totals, not sums of
+        # displayed groups: distinct counts and weighted ratios remain correct.
+        totals={}
+        for name in metrics:
+            x=current['metadata']['scoped_totals'].get(name)
+            y=baseline['metadata']['scoped_totals'].get(name)
+            totals.update({name+'_current':x,name+'_baseline':y,
+                           name+'_change':x-y if x is not None and y is not None else None,
+                           name+'_change_pct':(x-y)/y*100 if x is not None and y not in [None,0] else None})
+        p['metadata']['scoped_totals']=totals
         return [p]
     frame,meta=scoped_frame(db,request.dataset,scope,request.filters,request.period,request.whole_business_context)
     rows,missing,dimensions=_aggregate(frame,request,DEFINITIONS.get(request.dataset,('', ''))[0])

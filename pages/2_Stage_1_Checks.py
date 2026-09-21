@@ -42,4 +42,11 @@ if st.session_state.get('stage1_reports'):
     st.dataframe([dict(case=r['id'],group=r['group'],status=r['status'],passed=r['passed'],issues='; '.join((r.get('grade') or {}).get('issues',[])) or r.get('error','')) for r in reports],hide_index=True)
     st.download_button('Download acceptance results',json.dumps(reports,indent=2,default=str),'stage1_acceptance.json','application/json')
     with st.expander('Detailed results'):
-        st.code(json.dumps(reports,indent=2,default=str),language='json')
+        summaries=[dict(id=r['id'],status=r['status'],passed=r['passed'],error=r.get('error'),
+                        scope=(r.get('result') or {}).get('analytical_state',{}).get('scope'),
+                        answer=(r.get('result') or {}).get('display'),
+                        issues=(r.get('result') or {}).get('issues'),
+                        timing=(r.get('result') or {}).get('timing')) for r in reports]
+        st.code(json.dumps(summaries,indent=2,default=str),language='json')
+        case_id=st.selectbox('Result to inspect',[r['id'] for r in reports])
+        st.code(json.dumps(next(r for r in reports if r['id']==case_id),indent=2,default=str),language='json')

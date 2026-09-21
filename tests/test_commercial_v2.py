@@ -113,6 +113,19 @@ def test_missing_citation_is_repaired_but_unretrieved_number_is_rejected():
     with pytest.raises(QueryBlocked):
         validate_report(final(answer='Product revenue was AUD 999999.',sources=['E1']),packets,scope(),[])
 
+
+def test_grouped_comparison_preserves_independent_full_scope_totals(db):
+    from commercial.v2_runtime import validate_report
+    period=scope(entities=[],category='all',start_date='2026-09-01',end_date='2026-09-17',
+                 comparison_start='2026-08-01',comparison_end='2026-08-17')
+    packet=query_data(db,query(period='compare',dimensions=['item_type'],limit=1),period)[0]
+    packet['evidence_id']='E1'
+    totals=packet['metadata']['scoped_totals']
+    assert totals['revenue_current']==pytest.approx(20345)
+    assert totals['revenue_baseline']==pytest.approx(20655)
+    assert totals['revenue_change']==pytest.approx(-310)
+    validate_report(final(answer='Whole-business revenue fell AUD 310 to AUD 20,345.'),[packet],period,[])
+
 def test_empty_evidence_and_renamed_duplicate_counts_cannot_support_a_claim(db):
     from commercial.v2_runtime import validate_report
     with pytest.raises(QueryBlocked,match='No retrieved record'):

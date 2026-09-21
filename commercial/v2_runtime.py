@@ -13,7 +13,7 @@ from .v2_data import catalog, resolve_entities, query_data, read_records, staff_
 from .v2_prompts import SYSTEM, REVIEW, SYNTHESIS
 from .model_options import response_options
 
-ANSWER_RELEASE='21 Sep 2026 · commercial tools 2.1'
+ANSWER_RELEASE='21 Sep 2026 · commercial tools 2.2'
 MAX_ROUNDS=8
 MAX_DATA_CALLS=10
 TOOLS={
@@ -140,6 +140,9 @@ def optional_chart(report,results):
         if chart.source not in byid:raise QueryBlocked('The chart source was not retrieved.')
         i=byid[chart.source];spec=dict(kind=chart.kind,result=i,x=chart.x,y=chart.y,series=chart.series)
         validate_chart(results,spec)
+        groups={(str(r.get(chart.x)),str(r.get(chart.series)) if chart.kind=='bar' and chart.series else '') for r in results[i]['rows']}
+        if chart.kind in ['bar','line'] and len(groups)<2:
+            raise QueryBlocked('A comparison or trend needs at least two distinct categories or dates.')
         if chart.kind=='pie':
             p=results[i];rows=p['rows'];meta=p.get('metadata',{})
             total=meta.get('scoped_totals',{}).get(chart.y)
@@ -156,7 +159,8 @@ def adapt_report(report,results,scope,contexts,indices):
     byid={p['evidence_id']:i for i,p in enumerate(results)}
     selected=[byid[report.table_source]] if report.table_source in byid else []
     notes=[dict(context_id=n['id'],relevance='relevant' if n['id'] in report.context_used else 'not_relevant',interpretation='Owner-reported context considered; not independently established cause.') for n in contexts]
-    facts=[x for x in report.evidence if x.strip() not in byid]
+    import re
+    facts=[x for x in report.evidence if not re.fullmatch(r"[\s,;:'\"\[\]]*(?:E\d+[\s,;:'\"\[\]]*)+",x)]
     answer=dict(direct_answer=statement(report.answer),key_evidence=[statement(x) for x in facts],primary_driver=None,
                 secondary_drivers=[statement(report.explanation)] if report.explanation else [],alternatives=[],confidence=report.confidence,
                 next_step_kind='investigation' if report.confidence in ['insufficient evidence','possible explanation'] else 'action',
