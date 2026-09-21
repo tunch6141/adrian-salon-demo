@@ -1,6 +1,12 @@
 """General contract and factual data definitions, never evaluation recipes."""
 
 CONTRACT = '''OUTPUT AND TOOL PROTOCOL (follow exactly):
+Write short qualitative conclusions and only a few numerical evidence statements.
+Cite result_index values in each statement's sources list. Exact cell evidence
+is optional; do not spend effort constructing cell references when a whole
+result supports the claim. The application checks numerical facts against the
+returned source cells; the independent audit checks their meaning and scope.
+Never add percentages, ratios or differences absent from the calculations.
 Reference.result is the result_index ADDRESS, Reference.row is a zero-based row
 ADDRESS, and column is the exact key. NEVER put a revenue/count/value into result.
 For results[0].rows[1].amount, cite {result:0,row:1,column:"amount",format:"money"}.
@@ -151,6 +157,10 @@ mode does not establish that the whole business situation is healthy.
 An unqueried domain is not necessarily unavailable; distinguish not investigated
 from genuinely absent data. A fair uncertain answer can be approved, but not an
 unsupported confident answer with a caveat attached at the end.
+Check context relevance separately: a note about a particular entity is relevant
+only when that entity or an evidenced relationship is involved in this analysis.
+Sharing a broad business topic is not enough. Reject unrelated notes labelled
+relevant or used to imply an explanation.
 
 Audit the proposed commercial answer against the exact question,
 resolved scope, tool requests, returned evidence and owner context. This is a

@@ -80,7 +80,7 @@ def fixture(intake,variant):
     return t
 
 
-def run(client,model,intake,selected=None,on_case=None):
+def run(client,model,intake,selected=None,on_case=None,on_result=None):
     reports=[];staff_state=None
     for case in cases():
         if selected and case['id'] not in selected:continue
@@ -99,6 +99,7 @@ def run(client,model,intake,selected=None,on_case=None):
         except Exception as exc:
             reports.append(dict(**case,status='error',passed=False,error=type(exc).__name__+': '+str(exc)))
         finally:db.close()
+        if on_result:on_result(reports)
     return reports
 
 

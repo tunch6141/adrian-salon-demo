@@ -57,7 +57,7 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
     step=None;answer=None;rendered={};status='facts_only';tool_count=0
     for round_index in range(MAX_STEPS):
         stage('Understanding the business question' if round_index==0 else 'Testing the commercial explanation')
-        payload.update(results=[dict(r,result_index=i) for i,r in enumerate(results)],contexts=contexts,execution_trace=trace,validation_feedback=errors,
+        payload.update(results=[dict(r,result_index=i,rows=[dict(row,row_index=j) for j,row in enumerate(r['rows'])]) for i,r in enumerate(results)],contexts=contexts,execution_trace=trace,validation_feedback=errors,
                        remaining_steps=MAX_STEPS-round_index-1,remaining_tools=MAX_TOOLS-tool_count)
         if step:payload['current_investigation']=step.model_dump(exclude={'final'})
         previous_scope=step.scope.model_dump() if step else (state or {}).get('scope')

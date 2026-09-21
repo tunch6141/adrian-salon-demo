@@ -17,9 +17,14 @@ selected=st.multiselect('Cases to run',[c['id'] for c in cases()],default=[c['id
 if st.button('Run selected checks',disabled=not selected):
     intake=load_active(st.session_state,lambda key:st.secrets.get(key,''))
     progress=st.empty()
+    interim=st.empty()
+    def record_progress(current):
+        st.session_state.stage1_reports=list(current)
+        interim.dataframe([dict(case=r['id'],status=r['status'],passed=r['passed']) for r in current],hide_index=True)
     reports=run(OpenAI(api_key=st.secrets['OPENAI_API_KEY'],timeout=60,max_retries=0),'gpt-4.1-mini',intake,selected,
-        lambda name,n:progress.info(f'Checking {name} ({n+1} of {len(selected)})'))
+        lambda name,n:progress.info(f'Checking {name} ({n+1} of {len(selected)})'),record_progress)
     st.session_state.stage1_reports=reports
+    interim.empty()
     progress.success('Selected checks finished.')
 if st.session_state.get('stage1_reports'):
     reports=st.session_state.stage1_reports
@@ -27,4 +32,4 @@ if st.session_state.get('stage1_reports'):
     st.dataframe([dict(case=r['id'],group=r['group'],status=r['status'],passed=r['passed'],issues='; '.join((r.get('grade') or {}).get('issues',[])) or r.get('error','')) for r in reports],hide_index=True)
     st.download_button('Download acceptance results',json.dumps(reports,indent=2,default=str),'stage1_acceptance.json','application/json')
     with st.expander('Detailed results'):
-        st.json(reports)
+        st.code(json.dumps(reports,indent=2,default=str),language='json')

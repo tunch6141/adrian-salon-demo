@@ -21,8 +21,9 @@ class Reference(BaseModel):
 
 
 class Statement(BaseModel):
-    text: str = Field(max_length=360,description='Short plain-English statement, at most two numerical facts. Numeric facts must exactly match or faithfully round cited evidence. Optional [[0]] inserts the first evidence cell; never embed reference objects in text. Evidence supports the WHOLE meaning.')
-    evidence: list[Reference] = Field(default_factory=list,max_length=32)
+    text: str = Field(description='Short complete plain-English statement. Numeric facts must match returned calculations. Never reproduce a whole metrics table in prose.')
+    sources: list[int] = Field(default_factory=list,max_length=32,description='Zero-based result_index values supporting the whole statement. Prefer these result citations; application verifies numbers against the source rows.')
+    evidence: list[Reference] = Field(default_factory=list,max_length=32,description='Optional exact cell references; may be empty when sources are supplied.')
     context_ids: list[str] = Field(default_factory=list,max_length=6)
     level: Literal['observed','supported_interpretation','unverified_possibility']
 
@@ -32,6 +33,7 @@ class Hypothesis(BaseModel):
     test: str = Field(description='Evidence that would distinguish this from competing explanations')
     status: Literal['untested','supported','contradicted','inconclusive']
     evidence: list[Reference] = Field(default_factory=list,max_length=8)
+    sources: list[int] = Field(default_factory=list,max_length=12,description='Zero-based result_index values supporting the test outcome. Use these instead of cell references when citing a result as a whole.')
 
 
 class ToolCall(BaseModel):
@@ -68,7 +70,7 @@ class ContextReview(BaseModel):
 
 
 class Diagnosis(BaseModel):
-    direct_answer: Statement
+    direct_answer: Statement = Field(description='One short qualitative conclusion, without numerical detail. Put the few useful numbers in key_evidence. Avoid repeating them across sections.')
     key_evidence: list[Statement] = Field(max_length=3)
     primary_driver: Statement | None
     secondary_drivers: list[Statement] = Field(max_length=2)

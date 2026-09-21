@@ -83,7 +83,11 @@ def render_statement(statement,results,scope):
     # cell. Derived amounts must first be calculated. The independent audit checks
     # that citations support the entire meaning, units, scope and comparison.
     literal=re.sub(r'\[\[.*?\]\]','',text)
-    try:validate_claim_numbers(results,dict(text=literal,evidence=refs),statement.context_ids,[scope.start_date,scope.end_date])
+    checked_refs=list(refs)
+    for index in statement.sources:
+        if index<0 or index>=len(results):raise QueryBlocked(f'Unknown result source {index}; use an available result_index.')
+        checked_refs.extend(dict(result=index,row=j,column=k) for j,row in enumerate(results[index]['rows']) for k in row)
+    try:validate_claim_numbers(results,dict(text=literal,evidence=checked_refs),statement.context_ids,[scope.start_date,scope.end_date])
     except QueryBlocked as exc:
         raise QueryBlocked(f'{exc} Sentence: {text!r}; cited values: {values!r}. Cite each displayed value, or omit an uncomputed number.') from exc
     return re.sub(r'\[\[(.*?)\]\]',lambda m:slots[m.group(1)],text)
@@ -110,6 +114,9 @@ def complete_references(statement,results):
         tolerance=0.5*10**(-decimals)+1e-8
         if any(type(v) in (int,float) and abs(v-number)<tolerance for v in cited):continue
         matches=[(i,j,k) for i,j,k,v in cells if type(v) in (int,float) and abs(v-number)<tolerance]
+        # Retain all matching result sources for semantic review rather than
+        # guessing which of several equal-valued cells explains the statement.
+        statement.sources=sorted(set(statement.sources)|{i for i,_,_ in matches})
         if 0<len(matches)<=8 and len(existing|set(matches))<=32:
             for i,j,k in matches:
                 if (i,j,k) not in existing:
@@ -119,7 +126,9 @@ def complete_references(statement,results):
 def validate_answer(answer,results,contexts,scope,hypotheses,intent):
     problems=[]
     ids={c['id'] for c in contexts}
-    if {c.context_id for c in answer.context_review}!=ids:problems.append('Review every retrieved owner context note: '+', '.join(sorted(ids)))
+    if not ids:answer.context_review=[]  # There are no owner notes to review or display.
+    reviewed={c.context_id for c in answer.context_review}
+    if reviewed!=ids:problems.append(f'Context review must contain exactly these owner-note IDs: {sorted(ids)}. Remove unknown IDs {sorted(reviewed-ids)} and add missing IDs {sorted(ids-reviewed)}. Snapshot IDs and result IDs are not owner context. If there are no notes, return context_review=[].')
     if answer.next_step_kind=='action':
         if not answer.primary_driver or answer.primary_driver.level=='unverified_possibility' or answer.confidence in ['possible explanation','insufficient evidence']:
             problems.append('An action requires a supported primary diagnosis; otherwise recommend investigation.')
@@ -128,14 +137,15 @@ def validate_answer(answer,results,contexts,scope,hypotheses,intent):
         # Alternatives may be supported contributors or inconclusive, not necessarily contradicted.
         # The semantic audit checks whether the evidence justifies the confidence and mechanism.
     for h in hypotheses:
-        if h.status in ['supported','contradicted'] and not h.evidence:problems.append('A tested hypothesis needs evidence: '+h.explanation)
+        if h.status in ['supported','contradicted'] and not (h.evidence or h.sources):problems.append('A tested hypothesis needs evidence: '+h.explanation)
+        if any(i<0 or i>=len(results) for i in h.sources):problems.append('Hypothesis sources must be existing zero-based result_index values.')
         for ref in h.evidence:
             try:reference_value(results,ref.model_dump())
             except QueryBlocked as exc:problems.append(f'{exc}: hypothesis {h.explanation!r}, reference {ref.model_dump()}')
     rendered={}
     for s in statements(answer):
         if not set(s.context_ids)<=ids:problems.append('Unknown context reference: '+s.text)
-        if s.level!='unverified_possibility' and not (s.evidence or s.context_ids):problems.append('Observed facts and interpretations need evidence: '+s.text)
+        if s.level!='unverified_possibility' and not (s.evidence or s.sources or s.context_ids):problems.append('Observed facts and interpretations need a result source: '+s.text)
         try:
             complete_references(s,results)
             rendered[id(s)]=render_statement(s,results,scope)

@@ -100,6 +100,15 @@ def test_reference_completion_only_links_existing_calculated_values():
     with pytest.raises(QueryBlocked):render_statement(statement,results,scope())
 
 
+def test_result_citations_verify_numbers_without_model_cell_addresses():
+    from commercial.evidence import render_statement
+    statement=Statement(text='Revenue is 120; the difference is 20.',sources=[0],level='observed')
+    results=[dict(rows=[dict(revenue=120,difference=20)])]
+    assert render_statement(statement,results,scope())==statement.text
+    statement.text='Revenue is 900.'
+    with pytest.raises(QueryBlocked):render_statement(statement,results,scope())
+
+
 def test_revenue_tools_resolve_the_same_staff_ids_as_performance():
     from commercial.evidence import execute
     db=Database.from_intake(load_snapshot(),rules_override='')
