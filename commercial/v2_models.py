@@ -24,6 +24,8 @@ class FrameQuestion(BaseModel):
     hypotheses: list[str] = Field(max_length=3,description='Competing explanations to investigate, not assumed facts. Empty for a lookup.')
     clarification: str = ''
     context_draft: ContextDraft | None = None
+    current_window: Literal['custom','inherit','last_complete_week','current_week_elapsed','last_complete_month','current_month_elapsed','next_week'] = Field(default='custom',description='Prefer a named reporting-calendar window when applicable; it determines current start/end. custom uses scope dates. inherit preserves prior dates.')
+    baseline_window: Literal['custom','none','inherit','preceding_complete_week','preceding_complete_month','previous_month_matched_elapsed'] = Field(default='custom',description='A separate comparable baseline, never part of the current window. Named windows replace comparison dates. none clears comparison.')
 
 
 class Measure(BaseModel):

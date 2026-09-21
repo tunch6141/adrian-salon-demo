@@ -9,10 +9,10 @@ from analyst_engine import QueryBlocked, validate_claim_numbers, validate_chart
 from analytics.diagnostics import calendar_periods, booking_lookup, comparable_periods
 from .v2_models import (AnalysisScope, FrameQuestion, QueryData, ReadRecords,
                         StaffPerformance, ReadSQL, FinishAnswer, Review, BookingRecord, QueryCurrentData, ComparePeriods)
-from .v2_data import catalog, resolve_entities, query_data, read_records, staff_performance, read_sql
-from .v2_prompts import SYSTEM, REVIEW
+from .v2_data import catalog, resolve_entities, query_data, read_records, staff_performance, read_sql, ScopeRepairNeeded, DEFINITIONS
+from .v2_prompts import SYSTEM, REVIEW, SYNTHESIS
 
-ANSWER_RELEASE='21 Sep 2026 · commercial tools 2'
+ANSWER_RELEASE='21 Sep 2026 · commercial tools 2.1'
 MAX_ROUNDS=8
 MAX_DATA_CALLS=10
 TOOLS={
@@ -26,9 +26,12 @@ TOOLS={
  'finish_answer':(FinishAnswer,'Submit a concise evidence-grounded commercial answer. Checks can return feedback; correct or investigate further while budget remains. Charts are optional and cannot block a supported answer.')}
 
 
-def tool_schema(name,results=(),contexts=()):
+def tool_schema(name,results=(),contexts=(),db=None):
     model,description=TOOLS[name]
     function=pydantic_function_tool(model,name=name,description=description)['function']
+    if db is not None and name in ['query_data','compare_periods','read_records']:
+        datasets=[key for key in catalog(db) if name!='compare_periods' or DEFINITIONS.get(key,('', ''))[0]]
+        function['parameters']['properties']['dataset']['enum']=datasets
     if name=='finish_answer':
         params=function['parameters'];props=params['properties']
         evidence_ids=[r['evidence_id'] for r in results]
@@ -86,6 +89,8 @@ def _timing(stats,name,response,started):
 
 
 def validate_report(report,results,scope,contexts):
+    if not results or not any(p['rows'] for p in results):
+        raise QueryBlocked('No retrieved record supports a conclusion. Retrieve successful evidence before making factual claims; failed queries and an empty filtered subset do not establish business-wide absence.')
     byid={p['evidence_id']:i for i,p in enumerate(results)}
     if not report.sources and results:raise QueryBlocked('Cite the Evidence IDs supporting the answer.')
     if not set(report.sources)<=set(byid):raise QueryBlocked('Unknown Evidence ID. Use only '+', '.join(byid))
@@ -93,14 +98,26 @@ def validate_report(report,results,scope,contexts):
     for p in results:
         meta=p.get('metadata',{});rows=list(p['rows'])
         if meta.get('scoped_totals'):rows.append(meta['scoped_totals'])
+        rows.extend(meta.get('group_comparisons',[]))
         check_results.append(dict(p,rows=rows))
     for evidence_id in report.sources:
         i=byid[evidence_id]
         refs.extend(dict(result=i,row=j,column=k) for j,row in enumerate(check_results[i]['rows']) for k in row)
-    text='\n'.join([report.answer,*report.evidence,report.explanation,report.next_step,report.limitations])
+    if not set(report.context_used)<={r['id'] for r in contexts}:raise QueryBlocked('Only supplied context note IDs may be cited.')
+    # Reported facts can quote a cited owner note, including a written duration.
+    # This validates transcription, not causality; the semantic review retains
+    # the owner-reported distinction.
+    import re
+    words='zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen'.split()
+    for note in contexts:
+        if note['id'] not in report.context_used:continue
+        row={k:note.get(k,'') for k in ['explanation','start_date','end_date']}
+        row['explanation']=re.sub(r'\b('+'|'.join(words)+r')\b',lambda m:str(words.index(m[0].lower())),row['explanation'],flags=re.I)
+        i=len(check_results);check_results.append(dict(rows=[row]))
+        refs.extend(dict(result=i,row=0,column=k) for k in row)
+    text='\n'.join([report.answer,*report.evidence,report.explanation,report.limitations])
     validate_claim_numbers(check_results,dict(text=text,evidence=refs),report.context_used,
         [scope.start_date,scope.end_date,scope.comparison_start,scope.comparison_end],allow_magnitude=True)
-    if not set(report.context_used)<={r['id'] for r in contexts}:raise QueryBlocked('Only supplied context note IDs may be cited.')
     return [byid[key] for key in report.sources]
 
 
@@ -128,12 +145,13 @@ def adapt_report(report,results,scope,contexts,indices):
     byid={p['evidence_id']:i for i,p in enumerate(results)}
     selected=[byid[report.table_source]] if report.table_source in byid else []
     notes=[dict(context_id=n['id'],relevance='relevant' if n['id'] in report.context_used else 'not_relevant',interpretation='Owner-reported context considered; not independently established cause.') for n in contexts]
-    answer=dict(direct_answer=statement(report.answer),key_evidence=[statement(x) for x in report.evidence],primary_driver=None,
+    facts=[x for x in report.evidence if x.strip() not in byid]
+    answer=dict(direct_answer=statement(report.answer),key_evidence=[statement(x) for x in facts],primary_driver=None,
                 secondary_drivers=[statement(report.explanation)] if report.explanation else [],alternatives=[],confidence=report.confidence,
                 next_step_kind='investigation' if report.confidence in ['insufficient evidence','possible explanation'] else 'action',
                 next_step=statement(report.next_step) if report.next_step else None,visual=visual,table_results=selected,context_review=notes,
                 limitations=' '.join(x for x in [report.limitations,notice] if x))
-    display=dict(direct_answer=report.answer,key_evidence=report.evidence,primary_driver='',secondary_drivers=[report.explanation] if report.explanation else [],alternatives=[],next_step=report.next_step)
+    display=dict(direct_answer=report.answer,key_evidence=facts,primary_driver='',secondary_drivers=[report.explanation] if report.explanation else [],alternatives=[],next_step=report.next_step)
     return answer,display
 
 
@@ -146,13 +164,13 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
                  available_staff=db.intake.tables.get('staff',[]),catalog=catalog(db),
                  snapshot_id=db.intake.revision,unresolved_data_issues=len(db.intake.issues))
     messages=[dict(role='user',content=json.dumps(initial,default=str))]
-    frame=None;scope=AnalysisScope();answer=None;display=None;candidate=None;count=0;seen=set();status='facts_only'
+    frame=None;scope=AnalysisScope();answer=None;display=None;candidate=None;count=0;seen=set();status='facts_only';repair_scope=False
     for round_index in range(MAX_ROUNDS):
         stage('Understanding your business question' if frame is None else 'Investigating the evidence')
-        names=['frame_question'] if frame is None else list(TOOLS)
+        names=['frame_question'] if frame is None or repair_scope else list(TOOLS)
         if round_index==MAX_ROUNDS-1:names=['finish_answer']
         request_started=time.monotonic()
-        response=client.responses.create(model=model,instructions=SYSTEM,input=messages,tools=[tool_schema(n,results,contexts) for n in names],
+        response=client.responses.create(model=model,instructions=SYSTEM,input=messages,tools=[tool_schema(n,results,contexts,db) for n in names],
             tool_choice='required',parallel_tool_calls=len(names)>1,max_output_tokens=2400,temperature=0.1,store=False)
         _timing(stats,'investigation',response,request_started)
         messages.extend([item.model_dump(exclude_none=True) for item in response.output])
@@ -166,9 +184,15 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
                 request=TOOLS[call.name][0].model_validate_json(call.arguments)
                 if call.name=='frame_question':
                     prior=scope.model_dump() if frame else (state or {}).get('scope')
+                    for mode,start,end in [(request.current_window,'start_date','end_date'),(request.baseline_window,'comparison_start','comparison_end')]:
+                        if mode=='inherit':setattr(request.scope,start,None);setattr(request.scope,end,None)
+                        elif mode=='none':setattr(request.scope,start,'');setattr(request.scope,end,'')
+                        elif mode!='custom':
+                            setattr(request.scope,start,calendar[mode][0]);setattr(request.scope,end,calendar[mode][1])
                     scope=resolve_scope(request.scope,prior,request.relation if not frame else 'continue',calendar)
                     if request.intent not in ['context','clarify']:resolve_entities(db,scope.entities)
                     frame=request
+                    repair_scope=False
                     if frame.intent in ['context','clarify']:
                         status=frame.intent;break
                     contexts=context_candidates(context_store,db,scope)
@@ -211,6 +235,9 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
                     trace.append(dict(tool=call.name,request=request.model_dump(),sources=[p['evidence_id'] for p in new],status='ok'))
             except (QueryBlocked,ValidationError,ValueError,KeyError,TypeError) as exc:
                 errors=[str(exc)];output=dict(error=str(exc),remaining_data_calls=MAX_DATA_CALLS-count)
+                if isinstance(exc,ScopeRepairNeeded):
+                    repair_scope=True
+                    output.update(required_tool='frame_question',current_scope=scope.model_dump(),reporting_calendar=calendar)
                 trace.append(dict(tool=call.name,status='rejected',error=str(exc)))
             except Exception as exc:
                 import sqlite3
@@ -220,6 +247,34 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
                 trace.append(dict(tool=call.name,status='rejected',error=str(exc)))
             messages.append(dict(type='function_call_output',call_id=call.call_id,output=json.dumps(output,default=str)))
         if status in ['answered','context','clarify']:break
+    # One clean-context synthesis can recover useful verified evidence without
+    # carrying forward a planner's unsupported draft or repeated tool errors.
+    # It has exactly the same numerical and semantic gates, never a bypass.
+    if status=='facts_only' and frame is not None and results:
+        stage('Preparing the supported conclusion')
+        try:
+            started_call=time.monotonic()
+            grounded=dict(question=question,scope=scope.model_dump(),evidence=[{k:p[k] for k in ['evidence_id','rows','metadata'] if k in p} for p in results],owner_context=contexts)
+            fresh=client.responses.create(model=model,instructions=SYNTHESIS,input=json.dumps(grounded,default=str),
+                tools=[tool_schema('finish_answer',results,contexts)],tool_choice={'type':'function','name':'finish_answer'},
+                parallel_tool_calls=False,max_output_tokens=2000,temperature=0,store=False)
+            _timing(stats,'fresh_synthesis',fresh,started_call)
+            call=next(c for c in fresh.output if c.type=='function_call')
+            candidate=FinishAnswer.model_validate_json(call.arguments)
+            indices=validate_report(candidate,results,scope,contexts)
+            started_call=time.monotonic()
+            checked=client.responses.parse(model=model,instructions=REVIEW,text_format=Review,
+                input=json.dumps(dict(question=question,scope=scope.model_dump(),answer=candidate.model_dump(),results=results,contexts=contexts),default=str),
+                max_output_tokens=1000,temperature=0,store=False)
+            _timing(stats,'fresh_review',checked,started_call)
+            review=checked.output_parsed
+            if review is None:raise QueryBlocked('The evidence review did not complete.')
+            reviews.append(review.model_dump())
+            errors=review.blocking_errors+review.unsupported_statements
+            if not errors:
+                answer,display=adapt_report(candidate,results,scope,contexts,indices);status='answered'
+        except (QueryBlocked,ValidationError,ValueError,KeyError,TypeError,StopIteration) as exc:
+            errors=[str(exc)];trace.append(dict(tool='fresh_synthesis',status='rejected',error=str(exc)))
     saved=dict(scope=scope.model_dump(),last_question=question,snapshot_id=db.intake.revision,
                hypotheses=frame.hypotheses if frame else [],findings=[display['direct_answer'],*display['key_evidence']] if display else [],unresolved=errors)
     result=dict(engine='commercial_native_tools',answer_release=ANSWER_RELEASE,status=status,

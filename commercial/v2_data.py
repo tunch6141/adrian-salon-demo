@@ -9,6 +9,10 @@ from analyst_engine import QueryBlocked
 from analytics.diagnostics import packet, comparable_periods, staff_diagnostic, period_diagnostic
 from analytics.calculations import local_date
 
+
+class ScopeRepairNeeded(QueryBlocked):
+    pass
+
 # Data definitions, not instructions for which investigation to run.
 DEFINITIONS={
  'financial_lines':('posted_date','posted transaction item; net revenue includes refunds/discounts; direct costs already include allocations; gross profit excludes wages/overheads'),
@@ -110,6 +114,10 @@ def scoped_frame(db,dataset,scope,filters=(),period='current',whole_business_con
         days=frame[dc].astype('string').str[:10]
         frame=frame[days.ge(start)&days.le(end)];applied.append(dict(column=dc,start=start,end=end))
     for f in filters:
+        if f.column==dc and start and end and f.values and period!='snapshot':
+            days=[str(v)[:10] for v in f.values]
+            if (f.operator in ['eq','in'] and all(d<start or d>end for d in days)) or (f.operator in ['lt','lte'] and days[0]<start) or (f.operator in ['gt','gte'] and days[0]>end):
+                raise QueryBlocked('The date filter is outside the active period. Use period=comparison for baseline data, or change frame_question; an empty intersection is not evidence of zero.')
         for existing in applied:
             if f.column==existing['column'] and 'values' in existing and f.operator in ['eq','in']:
                 if not {str(v).casefold() for v in f.values}<={str(v).casefold() for v in existing['values']}:
@@ -133,6 +141,9 @@ def _aggregate(frame,request,date_column):
         frame=frame.assign(period_start=dates.dt.strftime('%Y-%m-01' if request.time_grain=='month' else '%Y-%m-%d'))
         dimensions=['period_start']+dimensions
     names=[m.name for m in request.measures]+[r.name for r in request.ratios]
+    signatures=[(m.column,m.operation) for m in request.measures]
+    if len(signatures)!=len(set(signatures)):
+        raise QueryBlocked('Identical aggregations cannot measure different outcomes under different names. Group by the distinguishing category/status or use separately filtered queries.')
     if len(names)!=len(set(names)) or set(names)&set(dimensions):raise QueryBlocked('Output names must be unique and separate from dimensions.')
     if not request.measures:raise QueryBlocked('Choose measures for aggregation; use read_records for individual records.')
     for m in request.measures:
@@ -164,8 +175,8 @@ def query_data(db,request,scope):
     if request.period=='compare':
         if not DEFINITIONS.get(request.dataset,('', ''))[0]:raise QueryBlocked('A snapshot cannot establish historical period changes. Select a dated dataset.')
         if request.time_grain!='none':raise QueryBlocked('For matched period totals use time_grain=none; use a separate trend query for time buckets.')
-        if not all([scope.start_date,scope.end_date,scope.comparison_start,scope.comparison_end]):raise QueryBlocked('Declare both comparison periods in frame_question.')
-        if not comparable_periods(scope.start_date,scope.end_date,scope.comparison_start,scope.comparison_end,1):raise QueryBlocked('Comparison periods must have equal duration or be complete calendar months. Use the matched elapsed calendar window.')
+        if not all([scope.start_date,scope.end_date,scope.comparison_start,scope.comparison_end]):raise ScopeRepairNeeded('Declare both comparison periods in frame_question.')
+        if not comparable_periods(scope.start_date,scope.end_date,scope.comparison_start,scope.comparison_end,1):raise ScopeRepairNeeded('Comparison periods must have equal duration or be complete calendar months. Use frame_question with separate named current and baseline windows, not query filters.')
         if scope.end_date>str(db.intake.asof.date()):raise QueryBlocked('Actuals stop at the reporting clock. Use matched elapsed dates, not a future month end.')
         current=query_data(db,request.model_copy(update={'period':'current'}),scope)[0]
         baseline=query_data(db,request.model_copy(update={'period':'comparison'}),scope)[0]
@@ -189,6 +200,19 @@ def query_data(db,request,scope):
     # absence checks have an independent denominator. No extra model/tool round.
     totals,_,_=_aggregate(frame,request.model_copy(update={'dimensions':[],'time_grain':'none'}),'')
     meta['scoped_totals']=totals[0] if totals else {}
+    # A small comparison also needs deterministic differences/ratios between
+    # like-for-like groups. Never combine different measures or query scopes.
+    comparisons=[]
+    if len(dimensions)==1 and 2<=len(rows)<=6:
+        for index,left in enumerate(rows):
+            for right in rows[index+1:]:
+                for measure in request.measures:
+                    x,y=left[measure.name],right[measure.name]
+                    if isinstance(x,(int,float)) and isinstance(y,(int,float)):
+                        comparisons.append(dict(dimension=dimensions[0],left=left[dimensions[0]],right=right[dimensions[0]],measure=measure.name,
+                            left_minus_right=x-y,left_divided_by_right=x/y if y else None,right_divided_by_left=y/x if x else None,
+                            left_vs_right_change_pct=(x-y)/y*100 if y else None))
+    if comparisons:meta['group_comparisons']=comparisons
     p=packet(db.intake,request.dataset,rows[:request.limit],json.dumps(meta,default=str));p['metadata']=meta
     return [p]
 
@@ -204,6 +228,8 @@ def read_records(db,request,scope):
 
 
 def staff_performance(db,request,scope):
+    if request.compare_periods and not comparable_periods(scope.start_date,scope.end_date,scope.comparison_start,scope.comparison_end,1):
+        raise ScopeRepairNeeded('Use frame_question to select matched current and baseline windows before staff comparison.')
     people=resolve_entities(db,scope.entities)
     if any(p['key']!='staff_id' for p in people):raise QueryBlocked('Staff performance requires staff identities.')
     names=[p['name'] for p in people] or [p['staff_name'] for p in db.intake.tables.get('staff',[])]

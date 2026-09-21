@@ -79,3 +79,41 @@ def test_native_review_can_request_more_data(db):
     assert result['status']=='answered' and len(result['results'])==2 and len(result['audit_reviews'])==2
     assert all('tools' in r for r in client.inputs)
     assert all(c['entity'] in ['Sam','Salon'] for c in result['contexts'])
+
+def test_fresh_synthesis_does_not_bypass_evidence_gate(db):
+    from commercial.v2_runtime import tool_schema
+    from unittest.mock import patch
+    framed=FrameQuestion(intent='lookup',relation='new',scope=scope(),hypotheses=[])
+    invalid=final(answer='Revenue was AUD 999999.')
+    client=NativeClient([('frame_question',framed),('query_data',query()),('finish_answer',invalid),('finish_answer',final())])
+    with patch('commercial.v2_runtime.MAX_ROUNDS',3):
+        result=investigate(client,'test',db,'Show product revenue',[],ContextStore())
+    assert result['status']=='answered'
+    assert result['timing']['calls'][-2]['stage']=='fresh_synthesis'
+    schema=tool_schema('finish_answer',result['results'])['parameters']
+    assert schema['properties']['sources']['items']['enum']==['E1']
+    assert schema['properties']['context_used']['maxItems']==0
+
+def test_reported_context_numbers_are_quotes_not_calculated_facts():
+    from commercial.v2_runtime import validate_report
+    result=dict(evidence_id='E1',rows=[dict(revenue=990)])
+    note=dict(id='NOTE',explanation='The owner reported two days of leave.',start_date='2026-08-10',end_date='2026-08-11')
+    validate_report(final(answer='The owner reported 2 days of leave.',context_used=['NOTE']),[result],scope(),[note])
+    with pytest.raises(QueryBlocked):
+        validate_report(final(answer='The owner reported 3 days of leave.',context_used=['NOTE']),[result],scope(),[note])
+
+def test_empty_evidence_and_renamed_duplicate_counts_cannot_support_a_claim(db):
+    from commercial.v2_runtime import validate_report
+    with pytest.raises(QueryBlocked,match='No retrieved record'):
+        validate_report(final(answer='Customers are leaving.',sources=[]),[],scope(),[])
+    with pytest.raises(QueryBlocked,match='Identical aggregations'):
+        query_data(db,query(dataset='booking_records',measures=[Measure(column='booking_id',operation='count',name='bookings'),Measure(column='booking_id',operation='count',name='cancellations')]),scope(entities=[],category='all'))
+
+def test_named_calendar_windows_and_scope_repair(db):
+    from commercial.v2_runtime import tool_schema
+    framed=FrameQuestion(intent='lookup',relation='new',scope=scope(start_date='2026-01-01',end_date='2026-09-17'),hypotheses=[],current_window='current_month_elapsed',baseline_window='previous_month_matched_elapsed')
+    client=NativeClient([('frame_question',framed),('query_data',query()),('finish_answer',final(answer='The requested product revenue was retrieved.'))])
+    result=investigate(client,'test',db,'Check this month',[],ContextStore())
+    s=result['analytical_state']['scope']
+    assert s['start_date']=='2026-09-01' and s['comparison_end']=='2026-08-17'
+    assert 'customer_returns' not in tool_schema('compare_periods',db=db)['parameters']['properties']['dataset']['enum']
