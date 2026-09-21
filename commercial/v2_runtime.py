@@ -179,7 +179,7 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
                  available_staff=db.intake.tables.get('staff',[]),catalog=catalog(db),
                  snapshot_id=db.intake.revision,unresolved_data_issues=len(db.intake.issues))
     messages=[dict(role='user',content=json.dumps(initial,default=str))]
-    frame=None;scope=AnalysisScope();answer=None;display=None;candidate=None;count=0;seen=set();status='facts_only';repair_scope=False
+    frame=None;scope=AnalysisScope();answer=None;display=None;candidate=None;count=0;seen=set();status='facts_only';repair_scope=False;clarification_reviewed=False
     for round_index in range(MAX_ROUNDS):
         stage('Understanding your business question' if frame is None else 'Investigating the evidence')
         names=['frame_question'] if frame is None or repair_scope else list(TOOLS)
@@ -205,6 +205,12 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
                         elif mode!='custom':
                             setattr(request.scope,start,calendar[mode][0]);setattr(request.scope,end,calendar[mode][1])
                     scope=resolve_scope(request.scope,prior,request.relation if not frame else 'continue',calendar)
+                    if request.intent=='clarify' and frame is None and state and not clarification_reviewed:
+                        try:resolve_entities(db,scope.entities)
+                        except QueryBlocked:pass  # Unknown identities really do need clarification.
+                        else:
+                            clarification_reviewed=True
+                            raise QueryBlocked('Review the existing analytical state before asking the owner. Reuse its metric, dates and category unless explicitly changed. Named known entities replace the previous entities and are compared separately by default. An optional presentation choice is not missing information. Frame an investigation if that resolves the request; ask again only if essential ambiguity remains. Previous scope: '+json.dumps(prior,default=str))
                     if request.intent not in ['context','clarify']:resolve_entities(db,scope.entities)
                     frame=request
                     repair_scope=False

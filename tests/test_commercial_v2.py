@@ -137,6 +137,19 @@ def test_dated_queries_cannot_bypass_scope_and_horizons_cannot_overlap(db):
     with pytest.raises(QueryBlocked,match='Identical aggregations'):
         query_data(db,query(dataset='customer_visits',measures=[Measure(column='booking_id',operation='count',name='visits'),Measure(column='booking_id',operation='count_distinct',name='customers')]),scope(entities=[],category='all'))
 
+
+def test_followup_reconsiders_optional_clarification_but_keeps_real_ambiguity(db):
+    prior=dict(scope=scope().model_dump(),snapshot_id=db.intake.revision)
+    unsure=FrameQuestion(intent='clarify',relation='continue',scope=scope(),hypotheses=[],clarification='Same metric?')
+    framed=FrameQuestion(intent='lookup',relation='continue',scope=scope(),hypotheses=[])
+    client=NativeClient([('frame_question',unsure),('frame_question',framed),('query_data',query()),('finish_answer',final())])
+    result=investigate(client,'test',db,'And this person?',[],ContextStore(),active_state=prior)
+    assert result['status']=='answered'
+    assert 'existing analytical state' in result['execution_trace'][0]['error']
+    unknown=unsure.model_copy(update={'scope':scope(entities=['Unknown person'])})
+    result=investigate(NativeClient([('frame_question',unknown)]),'test',db,'And Unknown person?',[],ContextStore(),active_state=prior)
+    assert result['status']=='clarify' and not result['results']
+
 def test_empty_evidence_and_renamed_duplicate_counts_cannot_support_a_claim(db):
     from commercial.v2_runtime import validate_report
     with pytest.raises(QueryBlocked,match='No retrieved record'):
