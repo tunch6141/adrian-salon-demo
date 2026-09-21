@@ -95,10 +95,10 @@ def run(client,model,intake,selected=None,on_case=None,on_result=None,initial_st
             if case['id']=='staff':staff_state=result['analytical_state']
             grade=None
             if result['status']=='answered':
-                grade=model_call(client,model,Grade,JUDGE,dict(question=case['question'],previous_state=staff_state if case['id']=='followup' else None,
+                grade=model_call(client,'gpt-4.1-mini',Grade,JUDGE,dict(question=case['question'],previous_state=staff_state if case['id']=='followup' else None,
                     answer=result['display'],diagnosis=result['answer'],hypotheses=result['hypothesis_tests'],scope=result['analytical_state']['scope'],
                     evidence=result['results'],trace=result['execution_trace']),[]).model_dump()
-            reports.append(dict(**case,status=result['status'],grade=grade,
+            reports.append(dict(**case,model=model,judge_model='gpt-4.1-mini',status=result['status'],grade=grade,
                 passed=bool(grade and all(v for k,v in grade.items() if k!='issues')),result=result))
         except Exception as exc:
             reports.append(dict(**case,status='error',passed=False,error=type(exc).__name__+': '+str(exc)))

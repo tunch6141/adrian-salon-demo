@@ -11,6 +11,7 @@ from .v2_models import (AnalysisScope, FrameQuestion, QueryData, ReadRecords,
                         StaffPerformance, ReadSQL, FinishAnswer, Review, BookingRecord, QueryCurrentData, ComparePeriods)
 from .v2_data import catalog, resolve_entities, query_data, read_records, staff_performance, read_sql, ScopeRepairNeeded, DEFINITIONS
 from .v2_prompts import SYSTEM, REVIEW, SYNTHESIS
+from .model_options import response_options
 
 ANSWER_RELEASE='21 Sep 2026 · commercial tools 2.1'
 MAX_ROUNDS=8
@@ -171,7 +172,7 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
         if round_index==MAX_ROUNDS-1:names=['finish_answer']
         request_started=time.monotonic()
         response=client.responses.create(model=model,instructions=SYSTEM,input=messages,tools=[tool_schema(n,results,contexts,db) for n in names],
-            tool_choice='required',parallel_tool_calls=len(names)>1,max_output_tokens=2400,temperature=0.1,store=False)
+            tool_choice='required',parallel_tool_calls=len(names)>1,**response_options(model,2400,0.1))
         _timing(stats,'investigation',response,request_started)
         messages.extend([item.model_dump(exclude_none=True) for item in response.output])
         calls=[item for item in response.output if item.type=='function_call']
@@ -206,7 +207,7 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
                     review_started=time.monotonic()
                     review_response=client.responses.parse(model=model,instructions=REVIEW,text_format=Review,
                         input=json.dumps(dict(question=question,scope=scope.model_dump(),answer=request.model_dump(),results=results,contexts=contexts),default=str),
-                        max_output_tokens=1000,temperature=0,store=False)
+                        **response_options(model,1000))
                     _timing(stats,'review',review_response,review_started)
                     review=review_response.output_parsed
                     if review is None:raise QueryBlocked('The evidence review did not complete.')
@@ -257,7 +258,7 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
             grounded=dict(question=question,scope=scope.model_dump(),evidence=[{k:p[k] for k in ['evidence_id','rows','metadata'] if k in p} for p in results],owner_context=contexts)
             fresh=client.responses.create(model=model,instructions=SYNTHESIS,input=json.dumps(grounded,default=str),
                 tools=[tool_schema('finish_answer',results,contexts)],tool_choice={'type':'function','name':'finish_answer'},
-                parallel_tool_calls=False,max_output_tokens=2000,temperature=0,store=False)
+                parallel_tool_calls=False,**response_options(model,2000))
             _timing(stats,'fresh_synthesis',fresh,started_call)
             call=next(c for c in fresh.output if c.type=='function_call')
             candidate=FinishAnswer.model_validate_json(call.arguments)
@@ -265,7 +266,7 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
             started_call=time.monotonic()
             checked=client.responses.parse(model=model,instructions=REVIEW,text_format=Review,
                 input=json.dumps(dict(question=question,scope=scope.model_dump(),answer=candidate.model_dump(),results=results,contexts=contexts),default=str),
-                max_output_tokens=1000,temperature=0,store=False)
+                **response_options(model,1000))
             _timing(stats,'fresh_review',checked,started_call)
             review=checked.output_parsed
             if review is None:raise QueryBlocked('The evidence review did not complete.')
@@ -277,7 +278,7 @@ def investigate(client,model,db,question,history,context_store,on_stage=None,act
             errors=[str(exc)];trace.append(dict(tool='fresh_synthesis',status='rejected',error=str(exc)))
     saved=dict(scope=scope.model_dump(),last_question=question,snapshot_id=db.intake.revision,
                hypotheses=frame.hypotheses if frame else [],findings=[display['direct_answer'],*display['key_evidence']] if display else [],unresolved=errors)
-    result=dict(engine='commercial_native_tools',answer_release=ANSWER_RELEASE,status=status,
+    result=dict(engine='commercial_native_tools',answer_release=ANSWER_RELEASE,model=model,status=status,
                 plan=dict(scope=scope.model_dump(),draft=frame.context_draft.model_dump() if frame and frame.context_draft else None,
                           missing_information=frame.clarification if frame else ''),answer=answer,results=results,contexts=contexts,
                 issues=errors,execution_trace=trace,analytical_state=saved,

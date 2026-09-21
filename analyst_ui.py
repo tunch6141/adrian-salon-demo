@@ -302,7 +302,7 @@ def render(t,setting):
         from analytics.runtime import CombinedContextStore
         store=CombinedContextStore(t,store)
     if not store.persistent:st.info('Context is session-only until Supabase is connected. It will not survive a reboot or a new browser session.')
-    revision=ANSWER_RELEASE+':'+getattr(t,'revision','legacy')
+    revision=ANSWER_RELEASE+':'+model+':'+getattr(t,'revision','legacy')
     if st.session_state.get('analyst_data_revision') != revision:
         st.session_state['v4_turns']=[]
         st.session_state.pop('active_analytical_state',None)

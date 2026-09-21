@@ -14,6 +14,8 @@ from analytics.persistence import load_active
 from openai import OpenAI
 
 selected=st.multiselect('Cases to run',[c['id'] for c in cases()],default=[c['id'] for c in cases()])
+model=st.selectbox('Model for this development check',['gpt-4.1-mini','gpt-5.4-mini'])
+st.caption('This selection affects only this development run, not the regular chat. GPT-5.4 mini uses low reasoning effort.')
 with st.expander('Reuse a previous check'):
     prior_state_text=st.text_area('Previous staff analysis (optional)',help='Paste the analytical_state from a completed staff check to test its follow-up without rerunning the staff check.')
 if st.button('Run selected checks',disabled=not selected):
@@ -29,7 +31,7 @@ if st.button('Run selected checks',disabled=not selected):
         st.session_state.stage1_reports=list(current)
         interim.markdown('| Completed case | Status | Automated review |\n|---|---|---|\n'+
             '\n'.join(f"| {r['id']} | {r['status']} | {'Pass' if r['passed'] else 'Review needed'} |" for r in current))
-    reports=run(OpenAI(api_key=st.secrets['OPENAI_API_KEY'],timeout=60,max_retries=0),'gpt-4.1-mini',intake,selected,
+    reports=run(OpenAI(api_key=st.secrets['OPENAI_API_KEY'],timeout=60,max_retries=0),model,intake,selected,
         lambda name,n:progress.info(f'Checking {name} ({n+1} of {len(selected)})'),record_progress,previous_staff)
     st.session_state.stage1_reports=reports
     interim.empty()

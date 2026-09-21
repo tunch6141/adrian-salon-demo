@@ -1,5 +1,9 @@
 # Stage 1 acceptance — 21 September 2026
 
+Later native-tool revision: see [NATIVE_TOOL_REVISION.md](NATIVE_TOOL_REVISION.md)
+for the current implementation and results. The report below preserves the
+earlier attempt and must not be treated as the latest test totals.
+
 ## Decision
 
 **Not accepted for normal use.** The implementation and repeatable harness are
