@@ -9,6 +9,7 @@ Use these tasks sequentially. Each task is intentionally small enough to impleme
 | 03 | Safe dynamic calculations, including same-lead-time booking pace | None expected | Pending |
 | 04 | Investigation stopping rule and simple owner answer contract | 2–3 focused checks only after unit tests | Pending |
 | 05 | Stronger deterministic + LLM acceptance gate | None expected initially | Pending |
+| 05A | Checkpoint diagnostics, frozen artifacts and first-failure localisation | Minimal; reuse saved artifacts | Pending |
 | 06 | Multi-turn follow-up checks harness with saved state and JSON diagnostics | Focused chain runs | Pending |
 | 07 | Boundary and hallucination checks harness | Focused boundary runs | Pending |
 | 08 | Focused regression, one 23-case run, repeatability and final report | Final planned live budget | Pending |
@@ -21,5 +22,7 @@ After each task:
 2. Report files changed and test results.
 3. Stop for review.
 4. Only then proceed to the next task.
+
+When debugging an already-built stage, run the smallest relevant checkpoint first and reuse frozen upstream artifacts where safe. Do not replay the complete pipeline merely to inspect a downstream presentation or review failure.
 
 Do not combine multiple tasks into a large refactor unless the owner explicitly approves it.
